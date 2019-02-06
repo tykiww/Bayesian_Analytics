@@ -1,0 +1,113 @@
+---
+title: "Homework 2"
+output: html_notebook
+---
+
+(1) For this question, we are working with the following probability mass function (pmf).
+
+$$
+f(x) =
+\frac{7!}{x!(7 − x)!}(.6)^x(.4)^(7-x) 
+\cdots
+{\substack{x∈\{0,1,2,3,4,5,6,7\}}}
+$$
+
+(a) Plot the pmf using R, and make sure to include the graphic and your R code in your answer. The axis
+labels and overall chart title should be descriptive–make the plot look nice and be self-explanatory.
+
+```{r, echo = T}
+k <- seq(0,7)
+plot(k,dbinom(k,size=7,prob=.6),type="h", 
+     lwd = 3, xlab = "x",
+     main = "Binomial (n = 7, p = .6) Distribution",
+     ylab = "F(x|n = 7,p = .6) : Probability Mass", col = "steel blue")
+
+
+
+```
+
+(b) What is the mean of X’s distribution?
+
+```{r}
+# mean = np
+n = 7
+p = .6
+n*p
+sum(dbinom(k,7,.6) * k) # or..
+```
+
+(c) What is the support of X’s distribution?
+
+```{r}
+k
+```
+
+(2) For this question, we are working with the following probability density function (pdf).
+
+$$
+f(x) = (1/100) exp(x/100) 
+\cdots 
+{\substack{(x<0)}}
+$$
+
+(a) Plot the pdf using R, and make sure to include the graphic and your R code in your answer. Also, make sure that you do NOT call the y-axis the probability, but rather the probability density (or density, for short).
+
+```{r}
+x <- seq(0,-200,-.1)
+fx <- (1/100)*exp(x/100)
+
+plot(x,fx, type = "l", lwd = 3, ylim = c(0,.010),
+     ylab = "F(x|λ = 1/100) : Probability Density", col = "forest green",
+     main ="PDF of X (1/λ = 100) " )
+```
+
+(b) What is the support of X’s distribution?
+
+```{r}
+"x < 0"
+```
+
+(3) Identify the following by using the appropriate R code. In each part below, the assumption is that Y has the Normal distribution with mean 20 and variance=42=16. In the future, I would abbreviate this by saying..
+
+$$
+Y ∼ N(20, 4^2)
+$$
+
+(a) What is the standard deviation of Y ? (No R code necessary for this part)
+
+```{r}
+"4"
+```
+
+(b) P(Y < 28.4).
+
+```{r}
+pnorm(28.4,20,4)
+```
+
+
+(c) P(Y > 14).
+
+```{r}
+1-pnorm(14,20,4)
+```
+
+(d) P(17.4 < Y ≤ 23.9).
+
+```{r}
+pnorm(23.9,20,4) - pnorm(17.4,20,4) 
+```
+
+(e) The first quartile (i.e., 25th percentile) of Y’s distribution.
+
+```{r}
+qnorm(.25,20,4)
+```
+
+
+(f) The probability density at the distribution’s mode (i.e., what is f(20), because’s the distribution’s peak is at the value y = 20).
+
+```{r}
+dnorm(20,20,4)
+```
+

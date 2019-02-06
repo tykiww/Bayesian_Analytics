@@ -1,0 +1,189 @@
+---
+title: "Homework 5"
+output: html_notebook
+---
+
+(1) Do opposites attract? Three Duke undergraduates conducted a study of this question in 1993. They asked
+questions of 28 female undergraduates concerning their own personalities. These included the following five
+questions: Are you 1. introverted, 2. easy-going, 3. studious, 4. serious, 5. gregarious? They asked the same five questions about the respondent’s ideal mates. Take “opposites attract” to mean that the respondent answers
+differently for their ideal mates than they do for themselves in at least two of the five questions. In this sample of 28, only 8 were attracted to opposites. Deeming this to be a random sample of Duke undergraduates,
+report and interpret in context a 90% posterior credible interval for the population proportion of those
+attracted to opposites. Use a beta(1, 1) prior density.
+
+```{r}
+alpha <- 1 ; beta <- 1
+success <- 8 ; length <- 28
+alphastar <- alpha + success
+betastar <- length - success + beta
+```
+
+```{r}
+creds <- qbeta(c(0.05, 0.95),9,21)
+paste("We are 90% sure that the posterior probability of the proportion of Duke undergraduate females attracted to opposites is between",round(creds[1],3),"and",round(creds[2],3))
+```
+
+
+(2) A study by Charles J. Graham and others at Arkansas Children’s Hospital in Little Rock addressed the question of whether left-handed children are more accident prone than right-handed children. Of 267 children between the ages of 6 and 18 who were admitted to a pediatric emergency room for trauma, 44 of them (or 16.5%) were indeed left-handed. The investigators claimed that about 10% of all children are left-handed. (Indeed, this was about the proportion of children who were admitted to the same emergency room for nontrauma reasons.) Consider the population of all pediatric trauma patients. Let θ represent the proportion of all pediatric trauma patients who are left-handed. Assume the beta(2, 18) prior density for θ.
+
+```{r}
+alpha <- 2 ; beta <- 18
+success <- 44 ; length <- 267
+alphastar <- alpha + success
+betastar <- length - success + beta
+```
+
+
+(a) For the Beta(2, 18) prior density, what is the a priori expected value of θ?
+
+```{r}
+alpha/(alpha + beta)
+```
+
+
+(b) Find and interpret a 95% posterior credibility interval for the population proportion of left-handers among
+all pediatric trauma patients.
+
+```{r}
+creds <- qbeta(c(0.025, 0.975),alphastar,betastar)
+paste("We are 95% sure that the posterior probability of the proportion of all pediatric trauma patients who are left-handed is between",round(creds[1], 4),"and",round(creds[2],4))
+```
+
+(c) Relying on the credible interval in part b, is it reasonable to claim that left-handed and right-handed
+children are equally accident prone, or is there substantial evidence that left-handed children are more
+accident prone? Explain your answer.
+
+
+<b>It is not reasonable to assume that left-handed children are less accident prone than right-handed children as the credible interval for the proportion of left-handed children is above .10 which is the proportion of children who were admitted to the same emergency room for nontrauma reasons.</b>
+
+(d) Find the posterior probability that θ is greater than 10%.
+
+```{r}
+1- pbeta(.1,alphastar,betastar)
+```
+
+(e) What is the posterior expected value of θ?
+
+```{r}
+alphastar/(alphastar+betastar)
+```
+
+(3) In a Newsweek poll taken on February 18-19, 1993, of 753 adults who were asked, “Would you favor additional
+taxes to pay for reforming and expanding health care in the United States?” 65% (or 489) said “yes.” Assuming
+a beta(20,20) prior density, report and interpret in context a 95% credible interval for the population proportion who would have answered “yes.”
+
+```{r}
+alpha <- 20 ; beta <- 20
+success <- 489 ; length <- 753
+alphastar <- alpha + success
+betastar <- length - success + beta
+```
+
+```{r}
+creds <- qbeta(c(0.025, 0.975),alphastar,betastar)
+paste("We are 95% sure that the posterior probability of the proportion who would pay to reform and expand health care in the US is between",round(creds[1], 4),"and",round(creds[2],4))
+```
+
+(4) Repeat the previous question, but this time using a beta(1,1) prior density instead of a beta(20,20) prior
+density. Also comment on how sensitive the resulting intervals are to the choice of which of these two priors
+was used.
+
+```{r}
+alpha <- 1 ; beta <- 1
+success <- 489 ; length <- 753
+alphastar <- alpha + success
+betastar <- length - success + beta
+```
+
+```{r}
+creds <- qbeta(c(0.025, 0.975),alphastar,betastar)
+paste("We are 95% sure that the poseterior probability of the proportion who would pay to reform and expand health care in the US is between",round(creds[1], 4),"and",round(creds[2],4))
+```
+
+<b> It doesn't seem that the resulting intervals are too sensitive based on the priors used as it only changed the intervals by about 1%. This is because there is so much more data than our confidence on the priors</b>
+
+(5) In a documentary film A Private Universe, only 2 of 23 gowned graduates at a Harvard University commencement were able to correctly answer the question: “Why is it hotter in summer than in winter?” In view of the results of the survey, it is difficult for me to believe that these 23 are a random sample of all Harvard graduates, but assume that they are for the sake of calculation. Assume a beta(1, 1) density for θ ≡ the proportion of Harvard graduates who would answer this question correctly.
+
+(a) What is the posterior distribution of θ?
+
+```{r}
+alpha <- 1 ; beta <- 1
+success <- 2 ; length <- 23
+alphastar <- alpha + success
+betastar <- length - success + beta
+paste("Beta(",alphastar,",",betastar,")", sep = "")
+```
+
+(b) Plot the prior (in gray) and the posterior (in black) densities on the same graph, and properly format
+this graph (including a legend to identify the prior and posterior).
+
+```{r}
+xx <- seq(0,1,length.out = 1000)
+prior <- dbeta(xx,1,1)
+posterior <- dbeta(xx,alphastar,betastar)
+plot(xx,prior,type = "l", col = "light gray", ylim = c(0,7), xlab = expression(theta),
+     main = "Beta(1,1) Prior vs Beta(3,22) Posterior Distribution",
+     ylab = expression(paste(pi, "(", theta, ")", sep="")))
+lines(xx,posterior,type = "l", col = "black")
+legend(.8,7,legend = c("Beta(1,1)", "Beta(3,22)"),col=c("gray", "black"), lty = 1,cex=0.8)
+```
+
+(c) Find a 99.5% (posterior) credible interval for this proportion.
+
+```{r}
+creds <- qbeta(c(0.0025, 0.9975),alphastar,betastar)
+paste("We are 99.5% sure that the posterior probability of the proportion of Harvard graduates who would answer this question correctly is between",round(creds[1], 4),"and",round(creds[2],4),".")
+```
+
+(6) For all parts of this question, you must get the answer in two ways: first, using Monte Carlo to estimate the requested quantities, and then exactly calculating the answer (using built-in R functions, if necessary). Make sure (as always) to include your R code.
+
+(a) P(Y < −13) if Y ∼ N(µ = −10, σ2 = 4).
+
+Monte Carlo
+
+```{r}
+library(dplyr)
+# If we were actually looking for P(Y < -13) out of a monte-carlo distribution
+mean(rnorm(10000,-10,4)  < -13)
+```
+
+Exact Answer
+
+```{r}
+pnorm(-13,-10,4)
+```
+
+(b) 90% (posterior) credible interval for θ if Y |θ ∼ Binomial(42, θ), θ ∼ Beta(5.8, 7.1), and y = 19.
+
+Monte Carlo
+
+```{r}
+n <- 42 ; y <- 19 ; alpha <- 5.8 ; beta <- 7.1
+alphastar <- alpha + y
+betastar <- n - y + beta
+theta <- rbeta(10000,alphastar,betastar)
+quantile(theta, c(0.05, 0.95))
+```
+
+Exact Answer
+
+```{r}
+lower <- qbeta(.05,alphastar,betastar)
+upper <- qbeta(.95,alphastar,betastar)
+c("5%" = lower, "95%" = upper)
+```
+
+(c) E(X) if X ∼ Binomial(109, .63)
+
+Monte Carlo means
+
+```{r}
+replicate(1000,mean(rbinom(100,109,.63))) %>% mean
+```
+
+Exact Answer
+
+```{r}
+109*.63
+```
+
+

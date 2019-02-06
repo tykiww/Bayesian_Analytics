@@ -1,0 +1,185 @@
+---
+title: "HOMEWORK 4, STAT 251"
+output: html_notebook
+---
+
+(1) Plot the Binomial(n = 47, θ = 0.8) pmf. Make sure the plot is properly labeled.
+
+```{r}
+require(dplyr)
+n <- 47 ; p <- 0.8 ; xax <- seq(0,n)
+plot(xax,dbinom(xax,size=n,prob=p),type="h", 
+     lwd = 3, xlab = "x",
+     main = "Binomial (n = 47, p = .8) Distribution",
+     ylab = "F(x|n = 47,p = .8) : Probability Mass", col = "steel blue")
+```
+
+(2) What is the expected value of a Binomial(n=47, θ = 0.8) random variable?
+
+```{r}
+n*p ; mean(rbinom(1000,size=n,prob=p))
+```
+
+
+(3) What is the standard deviation of a Binomial(n = 47, θ = 0.8) random variable?
+The next four problems are interrelated.
+
+```{r}
+sqrt(n*p*(1-p))
+mean(replicate(1000,sd(rbinom(1000,47,.8))))
+```
+
+(4) Following are data from a clinical trial involving chemotherapy for testicular cancer. It is considered a success
+if a patient survived five years past the clinical trial. 3 subjects survived for five years past the trial, while 8
+did not. What is the value of the (binomial) likelihood that 3 successes occur in 11 trials if θ (the probability
+of survival) is 0.5?
+
+```{r}
+# Y = Success, survive 5 years past clinical trial
+success <- 3
+failure <- 8
+p <- .5
+data <- sample(c(rep(1,success),rep(0,failure)),success+failure,replace=FALSE)
+dbinom(3,11,.5) # Likelihood that 3 successes occur in 11 trials
+```
+
+(5) Refer to question 4. What is the value of the likelihood if θ is 0.31?
+
+```{r}
+dbinom(3,11,.31)
+```
+
+(6) Refer to question 4. What is the value of the likelihood if θ is 0.27?
+
+```{r}
+dbinom(3,11,.27)
+```
+
+(7) Refer to question 4. Justify why you cannot find a value for θ that makes the likelihood larger than when
+θ = 3/11.
+
+<b>You can't get better than what your your best guess is, and your data happens to be your best guess</b>
+
+(8) Plot a beta (3, 5) pdf and a beta (5, 11) pdf on the same graph; the beta(3,5) should be in black and the beta
+(5,11) in gray. Also, be sure to properly format this graphic (x- and y-axes, overall title, and a legend).
+
+```{r}
+xax <- seq(0,1,length.out=1000)
+plot(xax,dbeta(xax,3,5), type = "l", col = "black", ylim = c(0,4), main = "Beta (3, 5) and Beta (5, 11) Distributions", ylab = "Probability Density", xlab = "y")
+lines(xax,dbeta(xax,5,11), type = "l", col = "gray")
+legend(.8,4,legend=c("Beta(3,5)", "Beta(5,11)"),
+       col=c("black", "gray"), lty = 1,cex=0.8)
+```
+
+
+(9) What is the height of the curve of a beta (1, 8) distribution at x = .24? That is, what is the pdf evaluated at
+x=.24?
+
+```{r}
+dbeta(.24,1,8)
+```
+
+(10) What is the probability a beta (1, 8) random variable is less than 0.13?
+
+```{r}
+pbeta(.13,1,8)
+```
+
+(11) What is the probability a beta (3, 9) random variable is greater than .4?
+
+```{r}
+1-pbeta(.4,3,9)
+```
+
+(12) What is the probability a beta (18,4.4) random variable is between 0.6 and 0.7?
+
+```{r}
+pbeta(.7,18,4.4)-pbeta(.6,18,4.4)
+```
+
+(13) At what value of x is the probability that a beta (4, 7) random varable is less than x equal to .71? That is,
+for what x is P r(beta(4, 7) random variable < x) = .71?
+
+```{r}
+(a <- qbeta(.71,4,7) ) %>% pbeta(4,7) -> b # To check.
+a
+```
+
+(14) At what value of x is the probability that a beta (12.2, 25.7) random variable is less than x equal to .2? That
+is, for what x is P r(beta(12.2, 25.7) random variable < x) = .2?
+
+```{r}
+(a <- qbeta(.2,12.2,25.7) ) %>% pbeta(4,7) -> b # To check.
+a
+```
+
+(15) What is the expected value of a beta (3.1,4.8) random variable?
+```{r}
+3.1/(3.1+4.8)
+mean(replicate(100,mean(rbeta(100,3.1,4.8)))) #ensemble monte carlo.
+```
+
+(16) What is the variance of a beta (3, 5) random variable?
+
+```{r}
+a <- 3
+b <- 5
+mean(replicate(10000,var(rbeta(100,a,b))))
+(a*b)/(((a+b)^2) * (a+b+1))
+```
+
+(17) What is the mode of a beta(2.8, 2.1) random variable?
+
+```{r}
+a <- 2.8
+b <- 2.1
+(a-1)/(a+b-2)
+```
+
+(18) Show that the mode of a beta(a,b) random variable is (a−1)/(a+b−2) when a > 1 and a + b > 2. 
+
+<b>refer to external paper</b>
+
+(19) Refer again to question 4. In general terms, what is the posterior distribution for θ given the results of the
+clinical trial described in question 4 and assuming a beta(a,b) prior distribution for θ. 
+
+<b>refer to external paper</b>
+
+(20) Refer again to question 4. For this problem and assuming a beta(a,b) prior, what is f(y) = R 1 0f(y|θ)π(θ)dθ?
+
+<b>refer to external paper</b>
+
+(21) Refer again to question 4. Create one figure with two plots (i.e., use par(mfrow=c(1,2))). Each plot will
+contain two curves, a red one representing the prior distribution of θ and a blue representing the posterior
+distribution of θ. For the left plot, use a beta(1,1) prior distribution. Comment on what this prior distribution
+implies regarding prior beliefs of the analyst and the impact it has on the posterior. For the right plot, use a
+beta(25,1) prior distribution. Comment on what this prior distribution implies regarding prior beliefs of the
+analyst and the impact it has on the posterior.
+
+```{r}
+par(mfrow = c(1,2))
+xax <- seq(0,1,length.out = 1000)
+## Prior Beta(1,1)
+prior <- dbeta(xax,1,1) ; plot(xax,prior, col = "dark red", type = "l", ylim = c(0,5),
+                               main = "Prior vs Posterior Distribution", xlab=expression(theta), 
+                               ylab= expression(paste(pi, "(", theta, ")", sep="")))
+astar <- 1 + 3 ; bstar <- 11-3 + 8
+post<- dbeta(xax,astar,bstar); lines(xax,post, col = "steel blue", type = "l")
+legend(.4,5,legend = c("Beta(1,1)", "Beta(4,16)"),col=c("dark red", "blue"), lty = 1,cex=0.8)
+
+## Prior Beta(25,1)
+prior <- dbeta(xax,25,1) ; plot(xax,prior, col = "dark red", type = "l", ylim = c(0,7),
+                               main = "Prior vs Posterior Distribution", xlab=expression(theta), 
+                               ylab= expression(paste(pi, "(", theta, ")", sep="")))
+astar <- 25 + 3 ; bstar <- 11-3 + 1
+post <- dbeta(xax,astar,bstar); lines(xax,post, col = "steel blue", type = "l")
+legend(0,7,legend = c("Beta(25,1)", "Beta(28,9)"),col=c("dark red", "blue"), lty = 1,cex=0.8)
+par(mfrow = c(1,1))
+```
+
+<b>The beta(1,1) prior distribution indicates that the analyst is basing his/her prior beliefs to be uniform. In other words, he is going into the analysis ignorant of any past information. However, since the number is very small, it may not have as much effect on the posterior distribution.</b>
+
+<b>The beta(25,1) prior distribution indicates that the analyst believes that there are many more successes than there are failures. This will impact the posterior greatly as we only have 11 points of data and raise the certainty of the posterior relative to the uniform.</b>
+
+
+
