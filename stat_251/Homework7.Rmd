@@ -1,0 +1,187 @@
+---
+title: "Homework7"
+output: html_notebook
+---
+
+## (1) 
+
+The Orem City Department of Public Works is responsible for repairing potholes in city streets. Although not exactly right, it is reasonable to assume that the number of potholes that need to be repaired in a city block follows a Poisson(θ) distribution. If the prior belief about θ is that it follows a gamma distribution with shape=.5 and rate=0.5,
+
+#### (a) 
+
+According to the prior distribution, what is the expected number of potholes per block? 
+
+```{r}
+# Prior = Gamma(0.5,0.5)
+paste(.5/.5, "Pothole expected")
+```
+
+#### (b) 
+
+What is the prior probability that θ exceeds 2.7?
+
+
+```{r}
+paste("The prior probability that the number of potholes in each block along a 20 block stretch on State Street is greater than 2.7 is ", round(1-pgamma(2.7,.5,.5),4))
+```
+
+## (2) 
+
+After a particularly heavy winter, they repaired the following number of *potholes in each block along a 20 block stretch of State St*: 3 3 7 1 4 6 6 7 3 1 5 5 5 3 3 0 3 1 2 2. We will assume that these data have a Poisson(θ) distribution. If Orem City’s prior belief about θ is as in the previous problem,
+
+```{r}
+potholes <- c(3, 3, 7, 1, 4, 6, 6, 7, 3, 1, 5, 5, 5, 3, 3, 0, 3, 1, 2, 2)
+```
+
+#### (a) 
+
+What is the posterior distribution of θ?
+
+```{r}
+astar <- .5 + sum(potholes)
+bstar <- .5 + length(potholes)
+paste("Gamma(",astar,",",bstar,")",sep = "")
+```
+
+#### (b) 
+
+What is their belief now, after seeing the data, about the expected number of potholes they will repair in each block of State St?
+
+```{r}
+paste("The expected number of potholes they will repair in each block of State street is now approximately ", round(astar/bstar,4),".", sep = "")
+```
+
+#### (c) 
+
+What is a 95% (posterior) credible interval for the parameter of the Poisson distribution?
+
+```{r}
+ci <- qgamma(c(.025,.975),astar,bstar)
+paste("After considering the data, the number of potholes in each block along a 20 block stretch on state street is between", round(ci[1],4), "and", round(ci[2],4),"with 95% posterior probability.")
+```
+
+#### (d) 
+
+What is the updated (i.e., posterior) probability that θ is greater than 2.7?
+
+```{r}
+paste("The posterior probability that the number of potholes in each block along a 20 block stretch on State Street is greater than 2.7 is ", round(1-pgamma(2.7,astar,bstar),4))
+rm(astar,bstar,ci,potholes)
+```
+
+## (3) 
+
+The Utah Highway Patrol believes the number of accidents per week along a 50 mile stretch of I-15 follows a Poisson(θ) distribution. Suppose their current belief about θ is that it follows a gamma distribution with shape=5.1 and *scale*=.8.
+
+#### (a) 
+
+In our class we discussed two parametrizations of the gamma distribution. Here we consider the parametrization in terms of shape and rate, rather than in terms of shape and scale. For their prior beliefs, what would the shape and rate inputs be for the gamma distribution? shape = , rate = .
+
+```{r}
+a <- 5.1 ; beta <- 0.8
+paste("Gamma(a = ",a,", b = ",1/beta,")", sep = "")
+```
+
+#### (b) 
+
+Derive the prior predictive distribution and use it to find the probability that in the next week there will be at least 3 accidents? What does this probability say about the appropriateness (or lack there of) of the prior distribution used by the Utah Highway Patrol? 
+
+```{r}
+# approximate
+theta <- rgamma(10000,a,1/beta) ; ynew <- rpois(10000,theta)
+paste("Under the current belief, the approximate prior probability that in the next week there being at least 3 accidents is ",round(mean(ynew>=3),4),". This shows how modest the probability to observe several accidents is especially considering a 50 mile stretch on the I-15 for a week. It seems reasonable depending on which stretch of road",sep = "" )
+
+# exact
+prp <- function(ynew,a,b) {
+  lprp <- lgamma(ynew + a) -( (ynew + a) * log((b)+1)) + a*log(b) - lgamma(a) - log(factorial(ynew) )
+  exp(lprp)
+}
+
+ext <- 1 - (sapply(0:2, function(x) prp(x,a,1/beta)) %>% sum)
+
+
+paste("Under the current belief, the prior probability that in the next week there being at least 3 accidents is ",round(ext,4),". This shows how modest the probability to observe several accidents is especially considering a 50 mile stretch on the I-15 for a week. It seems reasonable depending on which stretch of road",sep = "" )
+
+```
+
+#### (c) 
+
+If in the next week there were 5 accidents, what is their updated distribution for θ? Plot the prior
+distribution and posterior distribution on the same graph. (Prior in gray, posterior in black.)
+
+<i> View full plot in part d </i>
+
+#### (d) 
+
+In the month following the week with 5 accidents, there were 2, 0, 6, and 3 accidents per week. What is
+the new posterior for θ now? Plot it in red on the same graph as in part b. 
+
+```{r}
+# setup
+xax <- seq(0,11, length.out = 1001)
+prior <- dgamma(xax,a,1/beta)
+posterior <- dgamma(xax,a + 5, (1/beta) + 1)
+posterior2 <- dgamma(xax, a + sum(c(5,2,0,6,3)), (1/beta) + length(c(5,2,0,6,3)))
+# plot
+plot(xax, posterior, type = "l", main = "Prior vs Posterior (1) vs Posterior (2) Distributions", xlab = expression(theta),
+     ylab = expression(paste(pi,"(", theta,")", sep = "")), ylim = c(0,.6)) 
+lines(xax, prior, col = "dark gray")
+lines(xax, posterior2, col = "red")
+legend(7.6,.61,c("Gamma(5.1,1.25)","Gamma(10.1,2.25)", "Gamma(21.1,6.25)"), c("dark gray","black","red"))
+```
+
+#### (e)   
+
+Derive the posterior predictive distribution and use it to find the predictive probability that in the next
+week, there will be at least 3 accidents?  
+
+```{r}
+# approximate
+theta <- rgamma(xax, a + sum(c(5,2,0,6,3)), (1/beta) + length(c(5,2,0,6,3))) ; ynew <- rpois(10000,theta)
+paste("After considering the prior and the new data, the approximate posterior predictive probability that in the next week there is at least 3 accidents is ", round(mean(ynew>=3),4), sep = "" )
+# exact
+ext <- 1 - (sapply(0:2, function(x) prp(x,a+16,1/beta +5)) %>% sum)
+paste("After considering the prior and the new data, the posterior predictive probability that in the next week there is at least 3 accidents is ", round(ext,4), sep = "" )
+rm(list = ls())
+```
+
+## (4) 
+
+The City of Orem is interested in knowing if a new paving method will reduce the number of needed pothole repairs along State St. Since they know that the severity of the winter weather also affects the number of potholes, they collected data over a ten-year period prior to when the new paving method was used, and for 6 years after. For the ten years prior to the new method (the “before” period), the number of potholes in a “winter month” was as follows: 27 30 25 29 27 23 29 24 27 36 33 34 30 25 29 27 33 33 27 34 28 43 31 24 36 28 26 29 30 20 33. For the 6 years after the new method was used (the “after” period) the number of potholes in a “winter month” was as follows: 26 32 21 32 21 24 36 26 24 25 30 25 20 14 26 28 21 21. Use a gamma(shape=5, rate=0.2) prior for both cases (i.e., for θ during the before period and for θ during the after period).
+
+```{r}
+# Gamma(5,0.2) Prior for both.
+a <- 5 ; b <- 0.2 ; nReps <- 100000
+before <- c(27, 30, 25, 29, 27, 23, 29, 24, 27, 36, 33, 34, 30, 25, 29, 27, 33, 33, 27, 34, 28, 43, 31, 24, 36, 28, 26, 29, 30, 20, 33)
+after <- c(26, 32, 21, 32, 21, 24, 36, 26, 24, 25, 30, 25, 20, 14, 26, 28, 21, 21)
+```
+
+#### (a) 
+
+What is the posterior probability that the (population) rate of potholes in a “winter month” was higher before the new paving method was used than it was after the new paving method was used?
+
+```{r}
+bf <- rgamma(nReps, a + sum(before), b + length(before))
+af <- rgamma(nReps, a + sum(after), b + length(after))
+paste("Based on the priors we chose and the observed data, the approximate posterior probability that the rate of potholes in a 'winter month' was higher than it wa after the new paving method used is ", round(mean(bf>af),4), sep = "")
+```
+
+#### (b) 
+
+What are the mean and median of the posterior distribution of d = θbefore − θafter?
+
+```{r}
+paste("The average difference between pothole rates between before and after is approximately", round(mean(bf-af),4))
+paste("The median difference between pothole rates between before and after is approximately", round(median(bf-af),4))
+```
+
+#### (c) 
+
+Report and interpret in context a 95% (posterior) credible interval for d = θbefore − θafter?
+
+```{r}
+ci <- quantile(bf-af,c(.025,.975))
+paste("With .95 approximate posterior probability, the difference in pothole rates before the new method and after is between the interval", round(ci[1],4), "and", round(ci[2],4))
+rm(list=ls())
+```
+

@@ -1,0 +1,394 @@
+---
+title: "Homework 6"
+output: html_notebook
+---
+
+
+Do the following using R. You must also turn in a copy of your R code.
+
+
+Table 1. Career Major League Baseball Statistics for Ted Williams and Joe DiMaggio
+
+
+| Player       | At Bats | Hits  | Batting Average | Home runs | Home run average |
+|--------------|---------|-------|-----------------|-----------|------------------|
+| Ted Williams | 7,706   | 2,654 | .3444           | 521       | .0676            |
+| Joe DiMaggio | 6,821   | 2,214 | .3246           | 361       | .0529            |
+    
+
+## (1) 
+
+During the 1940s and 1950s, Ted Williams played baseball for the Boston Red Sox and Joe DiMaggio played
+for the New York Yankees. They were regarded as among the best players of their day, and the question of
+who was better was the subject of many heated arguments among baseball aficionados. Williams had the
+better batting record. Was he in fact a better hitter? Their major league career statistics are given in Table 1.
+Assume that at-bats are exchangeable for each player. (This assumption is only approximately correct for me.
+Players learn, change their batting style from time to time, and get older. Moreover, they do not always play
+in the same ball park, against the same pitcher, in the same weather, the style of ball may change, and so on.
+But the assumption may not be far off. And if we do not assume something, we will not be able to draw any
+conclusions!)
+
+
+#### (a) 
+
+First consider hits. A baseball afficionado’s prior probabilities concerning these two players’ “true proportions” of hits are given by independent beta(a, b) densities, where a = 50 and b = 120. (The values
+of a and b we assume do not matter much. Both Williams and DiMaggio had so many at-bats that we
+would get about the same answer even if we were to assume a = b = 1.) Find this fan’s posterior probability (given the preceding career statistics) that Ted Williams was a better hitter than Joe DiMaggio.
+(Interpret better to mean that there was a higher proportion of hits in the Williams model.)]
+
+```{r}
+# Ted Williams was a better hitter than Joe DiMaggio??
+a <- 50 ; b <- 120 # For both Prior Beta(50,120)
+# Ted Williams 
+y1 <- 2654 ; n1 <- 7706
+nReps <- 100000
+
+theta1 <- rbeta(nReps,a + y1, n1 - y1 + b)
+# Joe DiMaggio
+y2 <- 2214 ; n2 <- 6821
+theta2 <- rbeta(nReps,a + y2, n2 - y2 + b)
+
+paste("Based on the priors we chose and the observed data, the approximate posterior probability of Ted Williams being a better hitter than Joe DiMaggio is ", round(mean(theta1>theta2),4), sep = "")
+```
+
+#### (b) 
+
+Find this fan’s 95% posterior probability interval for the increase in the hitting success proportion for
+Williams over DiMaggio (that is, for θW − θD).
+
+```{r}
+ints <- quantile(theta1-theta2, c(0.025 ,0.975))
+
+paste("With .95 approximate posterior probability, the proportional increase in hitting success of Williams over DiMaggio is between the interval", round(ints[1],4),"and", round(ints[2],4))
+```
+
+#### (c) 
+
+Plot the (estimated) posterior density of θW − θD (in black) and the (estimated) prior density of θW −θD
+(in gray) on the same plot. Make sure to properly label all plot components.
+
+```{r}
+prior1 <- rbeta(nReps,a,b)
+prior2 <- rbeta(nReps,a,b)
+
+# plot
+plot(density(theta1-theta2),type = "l", col = "black", xlim  = c(-1/4,1/4),
+     main = "Estimated Posterior Densities of Hit Differences",
+     ylab = "Density", xlab = "Difference in Hitting Success θW − θD")
+lines(density(prior1-prior2), type = "l", col = "dark gray")
+legend(.125,51,c("Ted Williams", "Joe DiMaggio"), c("black", "dark gray"))
+```
+
+#### (d) 
+
+Now consider home runs. Find this fan’s posterior probability that Williams was a better home-run hitter
+than DiMaggio, assuming that for each player his prior distribution for the chance that player would hit
+a home run in any given at-bat is given by independent beta(20, 500) densities.
+
+```{r}
+rm(list = ls())
+# Was Ted Williams a better home-run hitter than Joe DiMaggio??
+a <- 20 ; b <- 500 # For both Prior Beta(20, 500)
+# Ted Williams 
+y1 <- 521 ; n1 <- 7706
+nReps <- 100000
+theta1 <- rbeta(nReps,a + y1, n1 - y1 + b)
+# Joe DiMaggio
+y2 <- 361 ; n2 <- 6821
+theta2 <- rbeta(nReps,a + y2, n2 - y2 + b)
+
+paste("Based on the priors we chose and the observed data, the approximate posterior probability of Ted Williams being a better hitter than Joe DiMaggio is ", round(mean(theta1>theta2),4), sep = "")
+```
+
+
+#### (e) 
+
+Based on the answers to the previous four parts, what conclusion(s) if any should the fan draw in comparing the two baseball players? Be sure to thoroughly explain your answer.
+
+*<b>From the priors we chose and the observed data, we can conclude that Ted Williams was a better hitter and home-run batter than Joe DiMaggio. This is based on an approximate posterior probability of Ted Williams hitting higher approximately 99.4% of the time and batting home runs higher 99.99% of the time.</b>*
+
+
+## (2) 
+
+To reinforce your understanding of prior-predictive distributions and posterior-predictive distributions we now
+consider predictions from the same baseball example. In baseball, one of the revered accomplishments is
+to have a batting average of .400 or above (baseball statistics always use three decimal places for a batting
+average) over the course of a season. This means that a player gets a hit in at least 40.0% of their at-bats
+during that season. As before, let θW represent the “true proportion” of hits for Ted Williams. We assume
+that Williams’ “true” but unobservable probability of getting a hit, θW , was constant over the course of his
+career (though, as discussed previously, there are reasons to doubt this assumption). Throughout all parts
+of this problem of the homework, we assume a Beta(50, 120) prior distribution for θW .
+
+### (a) 
+
+Suppose we knew that Williams would have five at bats in his first career game. What is the prior predictive probability that Williams would have at least a .400 (recorded) batting average after this first game? (That is, what is the prior predictive probability he gets at least two hits in his first five at bats, so that his recorded average is at least 2/5 =.400?) Recall that we assume the at-bats are conditionally iid, so that Ynew, first game|θW ∼ Binomial(nnew, first game = 5, θW ). Calculate the probability *EXACTLY*.
+
+```{r}
+# TED WILLIAMS A
+a <- 50 ; b <- 120 # For both Prior Beta(50,120)
+ynew <- 2 ;  nnew <- 5
+```
+
+
+```{r}
+# at least 2 exact.
+prior_predictive <- function(a, b, ynew, nnew) {
+  lgamma(a + b) - lgamma(a) - lgamma(b) + 
+    lchoose(nnew,ynew) + lgamma(a + ynew) + 
+    lgamma(b + nnew - ynew) - 
+    lgamma(a + b + nnew) -> lprp
+  exp(lprp)
+}
+ppp <- sum(sapply(2:5,function(x) prior_predictive(a,b,x,nnew)))
+
+
+paste("Based on the priors selected, the prior predictive probability of Ted Williams having at least a .400 batting average after this first game is ", round(ppp,4), sep = "")
+```
+
+### (b) 
+
+Refer to the previous question. Now, ESTIMATE the requested probability by appropriately using Monte
+Carlo.
+
+```{r}
+
+# Prior Predictive Distribution (has not changed because we have not observed new data)
+theta <- rbeta(100000, a,b) ; ynew <- rbinom(100000,nnew,theta)
+paste("Based on the priors selected, the approximate prior predictive probability of Ted Williams having at least a .400 batting average after this first game is ", mean(ynew>=2), sep = "")
+```
+
+### (c) 
+
+Suppose we knew that Williams would have 605 at bats in his first career season. What is the prior predictive probability that Williams would have at least a .400 (recorded) batting average after this first season? Calculate this probability exactly.
+
+```{r}
+# Ted Williams B
+a <- 50 ; b <- 120 # For both Prior Beta(50,120)
+ynew <- 242 ;  nnew <- 605
+```
+
+
+```{r}
+ppp <- sum(sapply(ynew:nnew, function(x) prior_predictive(a,b,x,nnew)))
+paste("Based on the priors selected and the data observed, the prior predictive probability of Ted Williams having at least a .400 batting average after his first career season is ", round(ppp,4), sep = "")
+```
+
+### (d) 
+
+Refer to the previous question. Now, ESTIMATE the requested probability by appropriately using Monte
+Carlo.
+
+```{r}
+# Prior Predictive Distribution (has not changed because we have not observed new data)
+theta <- rbeta(100000, a,b) ; ynew <- rbinom(100000,nnew,theta)
+paste("Based on the priors selected and the data observed, the approximate prior predictive probability of Ted Williams having at least a .400 batting average after his first career season is ", round(mean(ynew>=242),4), sep = "")
+```
+
+### (e) 
+
+The table of Williams’ actual batting career is provided above. We will suppose he had the chance to play
+one extra game right after this career, and that he would have five at-bats. Given our prior beliefs about
+θW and then the observed data from the table below, what is the probability that Williams would get at
+least two hits if he were to play one extra game at the end of his career, and we knew that he would have
+five at-bats? Calculate this posterior probability *exactly*.
+
+```{r}
+nobs <- 7706; yobs <- 2654
+astar <- yobs + a ; bstar <- nobs - yobs + b
+nnew <- 5
+```
+
+
+```{r}
+# Posterior predictive Exact
+posterior_predictive <- function(astar,bstar,nnew,ynew) {
+  lgamma(astar + bstar) - lgamma(astar) - lgamma(bstar) + 
+    lchoose(nnew,ynew) + lgamma(astar + ynew) + 
+    lgamma(bstar + nnew - ynew) - 
+    lgamma(astar + bstar + nnew) -> lpop
+  exp(lpop)
+}
+
+ppp <- sum(sapply(2:5, function(x) posterior_predictive(astar = astar,bstar = bstar,nnew = 5, ynew = x)))
+paste("Based on the priors selected and the data observed, the posterior predictive probability of Ted Williams getting at least two hits out of five after his career is ", round(ppp,4), sep = "")
+```
+
+### (f) 
+
+Refer to the previous question. Now, ESTIMATE the requested probability by appropriately using Monte
+Carlo.
+
+```{r}
+# Posterior Predictive Estimate
+theta <- rbeta(100000, astar,bstar)
+ynew <- rbinom(100000,nnew,theta) # for each value of theta, it creates a y new (essentially a for loop)
+paste("Based on the priors selected and the data observed, the approximate posterior predictive probability of Ted Williams getting at least two hits out of five after his career is ", round(mean(ynew>=2),4), sep = "")
+```
+
+### (g) 
+
+We will suppose he had the chance to play one extra season right after his career, and that he would have
+605 at-bats. Given our prior beliefs about θW and then the observed data from the table below, what is
+the probability that Williams would have a recorded batting average of at least .400 in this new season?
+Calculate this probability exactly. (Hint: we need the probability he would get at least 242 hits in the
+605 new at-bats.)
+
+```{r}
+ppp <- sum(sapply(242:605,function(x) posterior_predictive(astar = astar,bstar = bstar,nnew = 605, ynew = x)))
+paste("Based on the priors selected and the data observed, the posterior predictive probability of Ted Williams getting at least 242 hits out of 605 after his career is ", round(ppp,4), sep = "")
+```
+
+### (h) 
+
+Refer to the previous question. Now, ESTIMATE the requested probability by appropriately using Monte
+Carlo
+
+```{r}
+# Posterior Predictive Estimate
+theta <- rbeta(100000, astar,bstar)
+ynew <- rbinom(100000,605,theta)
+paste("Based on the priors selected and the data observed, the approximate posterior predictive probability of Ted Williams getting at least 242 hits out of 605 after his career is ", round(mean(ynew>=242),4), sep = "")
+```
+
+### (i) 
+
+Repeat the previous eight questions for Joe DiMaggio. We will use the same prior distribution for θD
+(i.e., the Beta(50, 120) distribution), but the posterior will be different because of DiMaggio’s different
+batting record.
+
+```{r}
+# Functions, packages, and general information
+library(dplyr)
+rm(list = ls())
+
+prior_predictive <- function(a, b, ynew, nnew) {
+  lgamma(a + b) - lgamma(a) - lgamma(b) + 
+    lchoose(nnew,ynew) + lgamma(a + ynew) + 
+    lgamma(b + nnew - ynew) - 
+    lgamma(a + b + nnew) -> lprp
+  exp(lprp)
+}
+
+posterior_predictive <- function(astar,bstar,nnew,ynew) {
+  lgamma(astar + bstar) - lgamma(astar) - lgamma(bstar) + 
+    lchoose(nnew,ynew) + lgamma(astar + ynew) + 
+    lgamma(bstar + nnew - ynew) - 
+    lgamma(astar + bstar + nnew) -> lpop
+  exp(lpop)
+}
+
+a <- 50 ; b <- 120 ; 
+nnew <- 5 ; npred <- 605
+nobs <- 6821; yobs <- 2214
+astar <- yobs + a ; bstar <- nobs - yobs + b
+nReps <- 100000
+```
+
+
+JOE DIMAGGIO
+
+#### Exact prior predictive probability he gets at least two hits in his first five at bats
+
+```{r}
+ppp <- sapply(2:5,function (x) prior_predictive(a = a,b = b, ynew = x, nnew = nnew)) %>% sum
+paste("Based on the priors selected, the prior predictive probability of Joe DiMaggio getting at least 2 hits out of 5 before his career is ", round(ppp,4), sep = "")
+```
+
+
+#### Estimated prior predictive probability he gets at least two hits in his first five at bats
+
+```{r}
+theta <- rbeta(nReps,a,b)
+ynew <- rbinom(nReps,nnew,theta)
+paste("Based on the priors selected, the approximate prior predictive probability of Joe DiMaggio getting at least 2 hits out of 5 before his career is ", round(mean(ynew>=2),4), sep = "")
+```
+
+
+#### Exact prior predictive probability that he would have a .400 batting average
+
+```{r}
+ppp <- sapply(242:npred, function(x) prior_predictive(a = a, b = b, ynew = x, nnew = npred)) %>% sum
+paste("Based on the priors selected and the data observed, the prior predictive probability of Joe DiMaggio getting at least 242 hits out of 605 before his career is ", round(ppp,4), sep = "")
+```
+
+
+#### Estimated prior predictive probability he gets at least two hits in his first five at bats
+
+```{r}
+theta <- rbeta(nReps,a,b)
+ynew <- rbinom(nReps,npred,theta)
+paste("Based on the priors selected and the data observed, the approximate prior predictive probability of Joe DiMaggio getting at least 242 hits out of 605 before his career is ", round(mean(ynew>=242),4), sep = "")
+```
+
+
+#### Exact posterior predictive probability he gets at least two hits in his next 5 at bats given data
+
+```{r}
+ppp <- sapply(2:5,function(x) posterior_predictive(astar = astar, bstar = bstar,nnew = nnew,x)) %>% sum
+paste("Based on the priors selected and the data observed, the posterior predictive probability of Joe DiMaggio getting at least 2 hits out of 5 after his career is ", round(ppp,4), sep = "")
+```
+
+
+#### Estimated posterior predictive probability he gets at least two hits in his next 5 at bats given data
+
+```{r}
+theta <- rbeta(nReps,astar,bstar)
+ynew <- rbinom(nReps,nnew,theta)
+paste("Based on the priors selected and the data observed, the approximate posterior predictive probability of Joe DiMaggio getting at least 2 hits out of 5 after his career is ", round(mean(ynew>=2),4), sep = "")
+```
+
+
+#### Exact posterior predictive probability he gets at least 242 hits in the next 605 at bats given data
+
+```{r}
+ppp <- sapply(242:npred,function(x) posterior_predictive(astar,bstar,npred,x)) %>% sum
+paste("Based on the priors selected and the data observed, the approximate posterior predictive probability of Joe DiMaggio getting at least 242 hits out of 605 after his career is ", round(ppp,4), sep = "")
+```
+
+
+#### Estimated posterior predictive probability he gets at least 242 hits in the next 605 at bats given data
+
+```{r}
+theta <- rbeta(nReps,astar,bstar)
+ynew <- rbinom(nReps,npred,theta)
+paste("Based on the priors selected and the data observed, the approximate posterior predictive probability of Joe DiMaggio getting at least 242 hits out of 605 after his career is ", round(mean(ynew>=242),4), sep = "")
+```
+
+
+### (j) 
+
+What is the probability that at the beginning of their careers, (so using prior-predictive distributions)
+that Williams’ recorded batting average would be strictly better than DiMaggio’s if each had 605 at bats
+in their first season? Use Monte Carlo.
+
+```{r}
+theta1 <- rbeta(nReps,a,b)
+theta2 <- rbeta(nReps,a,b)
+ynew1 <- rbinom(nReps,605,theta1)
+ynew2 <- rbinom(nReps,605,theta2)
+paste("Based on the priors selected, the approximate prior-predictive probability of Ted Williams strictly batting better than Joe DiMaggio if each had 605 at bats in their first season is ", round(mean(ynew1>ynew2),4))
+```
+
+### (k)
+
+What is the probability that after their careers, (so using posterior-predictive distributions) that Williams’
+recorded season average in a new season with 605 at bats would be strictly better than DiMaggio’s recorded
+season average in a new season with 605 at bats?
+
+```{r}
+a <- 50 ; b <- 120 ; y1 <- 2654; y2 <- 2214; 
+n1 <- 7706; n2 <- 6821
+astar1 <- a + y1 ; bstar1 <- n1 - y1 + b
+astar2 <- a + y2 ; bstar2 <- n2 - y2 + b
+
+theta1 <- rbeta(nReps,astar1,bstar1)
+theta2 <- rbeta(nReps,astar2,bstar2)
+ynew1 <- rbinom(nReps,605,theta1)
+ynew2 <- rbinom(nReps,605,theta2)
+paste("Based on the priors selected and data observed, the approximate posterior-predictive probability of Ted Williams strictly batting better than Joe DiMaggio if each had 605 at bats after their career is ", round(mean(ynew1>ynew2),4))
+```
+
+
+
+
+
