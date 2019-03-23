@@ -1,1 +1,1 @@
-# poisson-Gamma bayesian models
+# Poisson-Gamma bayesian models
