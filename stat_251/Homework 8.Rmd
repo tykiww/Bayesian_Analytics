@@ -1,0 +1,235 @@
+---
+title: "Homework 8"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+    theme: lumen
+---
+
+### (1)
+
+You have gathered mean arterial pressures from ten subjects currently being treated for high blood pressure with a specific drug regimen. Here are the data:
+
+```{r}
+mapr <- c(97.6, 117.7, 126.7, 111.0, 106.7, 108.4, 118.9, 108.6, 119.1, 106.2)
+```
+
+You assume these data are (conditionally) normally distributed.
+
+#### (a) Compute the log of the likelihood with µ = 112 and σ^2 = (8.4)^2
+
+```{r}
+logl <- function(µ,σ2,y) {
+  n <- length(y)
+  a <- -(1/2) * n * log(2 * pi)
+  b <- -(1/2) * n * log(σ2)
+  c <- -(1 / (2 * σ2)) * sum((y - µ)^2)
+  a + b + c
+}
+
+logl(112,8.4^2,mapr)
+log(prod(dnorm(mapr,112,8.4)))
+```
+
+#### (b) Compute the log of the likelihood with µ = ybar and σ2 = (1/n)sum(yi-ybar)^2 where ybar = (1/n) sum (yi).
+
+```{r}
+logl(mean(mapr),var(mapr),mapr)
+log(prod(dnorm(mapr,mean(mapr),sd(mapr))))
+```
+
+#### (c) Now plot the log of the likelihood for values of µ ranging from 110 to 114 in increments of .05, and with σ2 fixed at σ2 = (1/n)sum(yi-ybar)^2 where ybar = (1/n) sum (yi).
+
+```{r}
+likelihood <- sapply(seq(110,114,.05),function(i) logl(i,var(mapr),mapr))
+
+plot(seq(110,114,.05),likelihood, type = 'l', main = "Likelihood of µ from 110 to 114",
+     xlab = expression(theta), ylab = expression(paste(pi,"(", theta,")", sep = "")))
+points(seq(110,114,.05)[which.max(likelihood)],max(likelihood), col = "red", pch = 19)
+#abline(v = seq(110,114,.05)[which.max(likelihood)], col = "red", h = max(likelihood))
+rm(list=ls())
+```
+
+<hr>
+
+### (2) 
+
+Here is the total serum cholesterol for eight urban residents of Guatemala:
+
+```{r}
+cholest.u <- c(197, 199, 214, 217, 222, 227, 228, 234)
+```
+
+The population variance of serum cholesterol measurements for urban residents of Guatemala is assumed to be 260.
+The prior belief about the serum cholesterol of residents of Guatemala is that the population mean, µ(urban), should
+have a mean of 150 with a variance of 90 (and the prior will be a normal distribution).
+
+#### (a) What is the posterior distribution of the mean, µ(urban), in this case if it is assumed that the data are conditionally iid with a normal distribution?
+
+```{r}
+# Prior N(150,90)
+m <- 150 ; v <- 90
+# posterior params.
+starval <- function(m,v,y,sig2) {
+  n <- length(y)
+  ybar <- mean(y)
+  mstar <- (n*v*ybar + sig2*m)/(n*v + sig2)
+  s2star <- v*sig2/(n*v + sig2)
+  
+  c("m*" = mstar, "s2*" = s2star)
+}
+post.u <- starval(m,v,cholest.u,260)
+paste("Posterior is Normal(",round(post.u[1],3),",",round(post.u[2],3),")", sep = "")
+```
+
+<i> Normal Posterior distribution </i>
+
+#### (b) Plot the posterior distribution from part (a).
+
+```{r}
+xax <- seq(170,230)
+plot(xax,dnorm(xax,post.u[1],sqrt(post.u[2])),col='steel blue', type = 'l',
+     main = expression("Posterior of µ"[urban]),
+     xlab = expression(theta), ylab = expression(paste(pi,"(", theta,")", sep = "")))
+```
+
+<hr>
+
+### (3) 
+
+Here is the total serum cholesterol for ten rural residents of Guatemala:
+
+```{r}
+cholest.r <- c(139, 142, 143, 144, 145, 148, 155, 162, 171, 181)
+```
+
+The population variance is assumed to be 270. The prior belief about the serum cholesterol of residents of Guatemala
+is that the population mean, µ(rural), should have a mean of 150 with a variance of 90 (and be normally distributed).
+
+#### (a) What is the posterior distribution of the mean, µ(rural), in this case if it is assumed that the data are conditionally
+iid with a normal distribution?
+
+```{r}
+post.r <- starval(m,v,cholest.r,270)
+paste("Posterior is Normal(",round(post.r[1],3),",",round(post.r[2],3),")", sep = "")
+```
+
+#### (b) Plot the posterior distribution from part (a).
+
+```{r}
+xax <- seq(130,175)
+plot(xax,dnorm(xax,post.r[1],sqrt(post.r[2])),col='steel blue', type = 'l',
+     main = expression("Posterior of µ"[rural]),
+     xlab = expression(theta), ylab = expression(paste(pi,"(", theta,")", sep = "")))
+```
+
+<hr>
+
+### (4) 
+
+Extending the previous two questions, suppose that the urban data are also assumed to be independent of the rural
+data. Furthermore, assume that a priori µ(rural) is independent of µ(urban). With these assumptions, µ(rural) and µ(urban)
+will also be independent of each other a posteriori.
+
+#### (a) What is the posterior distribution of µ(urban) − µ(rural)?
+
+```{r}
+u <- starval(m,v,cholest.u,260); r <- starval(m,v,cholest.r,270)
+paste("Normal(",round(u[1]-r[1],4),",",round(u[2]+r[2],4),")", sep = "")
+```
+
+#### (b) *Plot the prior and the posterior distribution of µ(urban) − µ(rural) on the same graph.*
+
+```{r}
+# Prior µ: E(urban - rural) = 0 ; Prior σ: V(urban - rural) = 180
+xax <- seq(-100,100,length.out = 1001)
+plot(xax,dnorm(xax,0,sqrt(180)), ylim = c(0,.07), type = "l", col = "steel blue",
+     main = expression("Prior & Posterior Distribution of µ"[urban]*" - µ"[rural]),
+     xlab = expression(theta),ylab = expression(paste(pi,"(", theta,")", sep = "")))
+lines(xax,dnorm(xax,u[1]-r[1],sqrt(u[2]+r[2])), col = "forest green")
+```
+
+#### (c) State and interpret in the context of this problem the (central) 95% posterior credible interval for µ(urban) − µ(rural).
+
+```{r}
+difs <- qnorm(c(0.025,.975), u[1]-r[1], sqrt(u[2]+r[2]))
+paste("After considering the prior and our data, the mean difference in serum cholesterol measurements between urban and rural residents of Guatemal is between ",round(difs[1],4)," and ",round(difs[2],4)," with 95% posterior probability.", sep = "" )
+```
+
+<hr>
+
+
+### (5) 
+
+*GIVE THIS A TRY!!*
+
+The number of immature red tail hawks sitting on fence posts or power poles along a mile-long stretch of rural
+highway can reasonably be assumed to follow a Poisson distribution. However, we will be comparing data six years
+apart (in 2003 and then in 2009), and we suspect there might be differences in behavior between 2003 and 2009. Thus,
+we will assume the observations from 2003 follow the Poisson(θ 2003) distribution, and the observations from 2009
+follow the Poisson(θ 2009) distribution. We’ll also assume the 2003 data are independent of the 2009 data. Assume
+that a priori θ2003 and θ2009 are independent of each other.
+
+#### (a) Along a 10 mile stretch of highway south of Saratoga Springs in 2003, the count of hawks per mile was 
+
+```{r}
+hawks.2003 <- c(0, 2, 0, 0, 0, 4, 3, 0, 0, 1) 
+```
+
+What is the expected value of the posterior distribution for θ2003 if the prior is a gamma distribution with shape=0.2 and rate=0.2?
+
+```{r}
+astar_2003 <- 0.2 + sum(hawks.2003)
+bstar_2003 <- 0.2 + length(hawks.2003)
+"The expected value of the posterior distribution of θ_2003 is %s" %>%
+  sprintf(astar_2003/bstar_2003)
+
+sprintf("The expected value of the posterior distribution of θ_2003 is %s",astar_2003/bstar_2003)
+```
+
+#### (b) Along that same stretch of highway in 2009, the counts were
+
+```{r}
+hawks.2009 <- c(1,1,3,3,2,2,2,4,0,3)
+```
+
+What is the expected value of the posterior distribution for θ2009 if the same prior is used as in the previous
+problem (i.e., Gamma(0.2,0.2)?
+
+```{r}
+astar_2009 <- 0.2 + sum(hawks.2009)
+bstar_2009 <- 0.2 + length(hawks.2009)
+"The expected value of the posterior distribution of θ_2009 is %s" %>%
+  sprintf(round(astar_2009/bstar_2009,4))
+```
+
+#### (c) What is the expected value of the posterior distribution of d = θ2009 − θ2003?
+
+```{r}
+# MC
+
+"The expected value of the posterior distribution of d is %s" %>%
+  sprintf(round(mean(rgamma(10000,astar_2009,bstar_2009) - rgamma(10000,astar_2003,bstar_2003)),4))
+
+```
+
+
+#### (d) What is the 95% posterior credible interval for d?
+
+```{r}
+hawks <- quantile(rgamma(100000,astar_2009,bstar_2009) - rgamma(100000,astar_2003,bstar_2003),c(.025,.975))
+paste("After considering the prior and our data, the mean difference in immature red tail hawks along a mile long stretch of rural highway is between ", round(hawks[1],4), " and ", round(hawks[2],4)," with 95% posterior probability" , sep = "" )
+```
+
+
+#### (e) Plot the Monte-Carlo estimated posterior distribution of d = θ2009−θ2003 by using the density and plot functions
+in R.
+
+```{r}
+obj <- rgamma(100000,astar_2009,bstar_2009) - rgamma(100000,astar_2003,bstar_2003)
+plot(density(obj), main = expression("MC Estimated Density of θ"[2009]*"−θ"[2003]),
+     xlab = expression(theta), ylab = expression(paste(pi,"(", theta,")", sep = "")))
+rm(list = ls())
+```
+

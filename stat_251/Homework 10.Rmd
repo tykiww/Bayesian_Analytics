@@ -1,0 +1,244 @@
+---
+title: "Homework 10"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+    theme: yeti
+---
+
+```{r}
+# packages
+library(invgamma)
+library(tidyverse)
+# Data
+fish_oil <- c(8, 12, 10, 14, 2, 0, 0)
+urban <- c(197, 199, 214, 217, 222, 223, 227, 228, 234)
+rural <- c(139, 142, 143, 144, 145, 148, 155, 162, 171, 181)
+# Functions
+norm_mcmc <- function(J, y, m, v, a, b, starting_mu_sig2 = TRUE) {
+  
+  #'  m, v, a, b : full-conditional priors for NN and IG
+  #'  J : Monte-Carlo iterations
+  #'  y : Data
+  #'  starting_mu_sig2 : specifies whether to choose starting values from the data or choose 0 and 1
+  
+  # Set empy vector for mu, sig2
+  mu <- c() ; sig2 <- c()
+  # Get important values
+  n <- length(y) ; ybar <- mean(y) ; s2 <- sd(y)
+  if (starting_mu_sig2 == TRUE) {
+    mu[1] <- ybar ; sig2[1] <- s2
+  } else { mu[1] <- 0 ; sig2[1] <- 1}
+  
+  
+  for (j in 2:J) {
+    # Create posterior for unknown mu
+    mstar <- ((n * v * ybar) + (m * sig2[j-1])) / (n * v + sig2[j-1])
+    vstar <- (v * sig2[j-1]) / (n * v + sig2[j-1])
+    mu[j] <- rnorm(1,mstar,sqrt(vstar))
+    # Create posterior for unknown sig^2
+    astar <- a + (n/2)
+    bstar <- b + sum((y-mu[j])^2)/2
+    sig2[j] <- rinvgamma(1,astar,bstar)
+  }
+  list("mu" = mu,"sig2" = sig2, "post-pred" = rnorm(J,mu,sqrt(sig2)), 
+       "Prior-pred" = rnorm(J,rnorm(J,m,sqrt(v)), sqrt(rinvgamma(J,a,b))))
+  # taking a looooooop of each mu and sig2, so okay to perish at certain values.
+}
+```
+
+## (1) 
+
+A study was done to see if taking a fish oil supplement lowered blood pressure. For the seven subjects the change in blood pressure was: 8, 12, 10, 14, 2, 0, 0. The study organizers felt it was reasonable to assume the data were conditionally iid and normally distributed. For the prior distribution of µ, we have chosen a Normal distribution with a mean of 6 and a variance of 32. For the prior distribution for σ<sup>2</sup>, we have chosen an inverse gamma with shape=3 and rate=50.
+
+
+```{r}
+### Run a gibbs sampler (unkown mu and sig^2) ###
+mu_sig <- norm_mcmc(102000, fish_oil, 6, 32, 3, 50, TRUE)
+plot(mu_sig$sig2, type = 'l', col = "red") ; lines(mu_sig$mu, type = 'l') ; # seems like it converged immediately
+acf(mu_sig$mu) ; acf(mu_sig$sig2) # It looks like thinning every 5th or 10th value may be necessary
+
+ind <- seq(2000,102000,by = 5)[-1] # burn first 2000 and keep every 10th.
+mu_sig$mu <- mu_sig$mu[ind]
+mu_sig$sig2 <- mu_sig$sig2[ind]
+mu_sig$`post-pred` <- mu_sig$`post-pred`[ind]
+mu_sig$`Prior-pred` <- mu_sig$`Prior-pred`[ind]
+```
+
+### (a) 
+
+What is the posterior probability that µ is greater than 0?
+
+```{r}
+mean(mu_sig$mu > 0)
+```
+
+### (b)  
+
+What is the posterior probability that σ<sup>2</sup> > 30?
+
+```{r}
+mean(mu_sig$sig2 > 30)
+```
+
+### (c)  
+
+Plot the prior and the posterior for µ on the same graph.
+
+```{r}
+plot(density(mu_sig$mu), xlim = c(-75,75), main = "Prior and Posterior µ", col = "blue")
+seq(-75,75, length.out = 1000) %>% lines(dnorm(seq(-75,75, length.out = 1000),6,sqrt(32)), col = "red")
+legend("topright",1, c("Posterior", "Prior"), c("Blue","red"))
+```
+
+### (d)  
+
+Plot the prior and posterior for σ <sup>2</sup> on the same graph.
+
+```{r}
+plot(density(mu_sig$sig2), xlim = c(0,150), ylim = c(0, .06), main = "Prior and Posterior σ^2", col = "blue")
+seq(0,150, length.out = 1000) %>% lines(dinvgamma(seq(0,150, length.out = 1000),3,50), col = "red")
+legend("topright",1, c("Posterior", "Prior"), c("Blue","red"))
+rm(fish_oil,mu_sig)
+```
+
+
+## (2) 
+
+These next two problems 3-5 from the prevous homework, but relaxing the assumption that the mean is known. As before, here is the total serum cholesterol for 9 urban residents of Guatemala: 197, 199, 214, 217, 222, 223, 227, 228, 234. It is assumed that Y<sub>urban</sub>,i|σ<sup>2</sup><sub>urban</sub> iid∼ N(µ<sub>urban</sub>, σ<sup>2</sup><sub>urban</sub>), where Y<sub>urban</sub>, i denotes the total serum cholesterol for the ith individual in the sample of Guatemalan urban residents. The prior belief about σ<sup>2</sup><sub>urban</sub>, the variance of the serum cholesterol of urban residents of Guatemala, is that it has an inverse gamma distribution with shape=2.1 and rate=480. The prior belief about µ<sub>urban</sub>, the mean serum cholesterol of urban residents of Guatemala, is that it has a normal distribution with a mean of 180 and a variance of 10<sup>2</sup> = 100.
+
+```{r}
+### Run a gibbs sampler (unkown mu and sig^2) ###
+mu_sig <- norm_mcmc(102000, urban, 180, 100, 2.1, 480, TRUE)
+plot(mu_sig$sig2, type = 'l', col = "red") ; lines(mu_sig$mu, type = 'l') ; # seems like it converged ~20
+acf(mu_sig$mu) ; acf(mu_sig$sig2) # Thinning to the first 5 or 10 again seems good. However, to be safe do 10
+ind <- seq(2000,102000,by = 10)[-1] # burn first 2000 and keep every 10th.
+mu_sig$mu <- mu_sig$mu[ind]
+mu_sig$sig2 <- mu_sig$sig2[ind]
+mu_sig$`post-pred` <- mu_sig$`post-pred`[ind]
+mu_sig$`Prior-pred` <- mu_sig$`Prior-pred`[ind]
+```
+
+### (a) 
+
+Get draws from the posterior distribution, and plot the posterior distribution for the mean on one graph and the posterior distribution for the variance on another graph.
+
+```{r}
+par(mfrow = c(1,2))
+plot(density(mu_sig$mu), "Mean Posterior"); plot(density(mu_sig$sig2), "Variance Posterior") ;
+par(mfrow = c(1,1))
+```
+
+
+
+### (b) 
+
+What is the posterior expected value of σ<sup>2</sup><sub>urban</sub>?
+
+```{r}
+mean(mu_sig$sig2)
+```
+
+### (c) 
+
+What is the posterior expected value of µ<sub>urban</sub>?
+
+```{r}
+mean(mu_sig$mu)
+```
+
+### (d) 
+
+Now, assume the prior belief about the mean is that it is normally distributed with a mean of 180 and a variance of 20<sup>2</sup> = 400 (The prior for σ<sup>2</sup><sub>urban</sub> is still the same). Again get posterior draws for the mean and variance. This time plot the two posterior distributions for the mean, and include them on the same graph (the posterior for µ<sub>urban</sub> from part (a) in gray, and the posterior for µ<sub>urban</sub> from this part in black)
+
+```{r}
+mu_sig2 <- norm_mcmc(102000, urban, 180, 20^2, 2.1, 480, TRUE)
+plot(mu_sig2$sig2, type = 'l', col = "red") ; plot(mu_sig2$mu, type = 'l') ; # seems like it converged immediately
+acf(mu_sig2$mu) ; acf(mu_sig2$sig2) # Thinning to the first 5 or 10 again seems good because of sig2
+
+ind <- seq(2000,102000,by = 5)[-1] # burn first 2000 and keep every 5th.
+# Burn the first 2000 since we have a large sample.
+mu_sig2$mu <- mu_sig2$mu[ind]
+mu_sig2$sig2 <- mu_sig2$sig2[ind]
+mu_sig2$`post-pred` <- mu_sig2$`post-pred`[ind]
+mu_sig2$`Prior-pred` <- mu_sig2$`Prior-pred`[ind]
+```
+
+
+
+
+```{r}
+plot(density(mu_sig2$mu), col = "black", main = expression(paste("Posterior of ","µ"[urban1]," and", "µ"[urban2])))
+lines(density(mu_sig$mu), col = "gray")
+legend("topright",1, c(expression("µ"[Urban2]), expression("µ"[Urban1])), c("Black","Gray"))
+```
+
+## (3) 
+
+Here is the total serum cholesterol for 10 rural residents of Guatemala: 139, 142, 143, 144, 145, 148, 155, 162, 171, 181. The response variable (total serum cholesterol) is assumed to be conditionally iid and normally distributed. The prior belief about the serum cholesterol of rural residents of Guatemala is that the population mean should have a mean of 150 with a variance of 500. The prior for the variance is an inverse gamma with shape=3 and rate=180. Plot the posterior for the mean.
+
+```{r}
+mu_sig3 <- norm_mcmc(102000, rural, 150, 500, 3, 180, TRUE)
+plot(mu_sig3$sig2, type = 'l', col = "red") ; lines(mu_sig3$mu, type = 'l') ; # seems like it converged immediately
+acf(mu_sig3$mu) ; acf(mu_sig3$sig2) # Variance shows above cutoff autocorrelation up to 5th multiple.
+ind <- seq(2000,102000, by = 5)[-1]
+mu_sig3$mu <- mu_sig3$mu[ind]
+mu_sig3$sig2 <- mu_sig3$sig2[ind]
+mu_sig3$`post-pred` <- mu_sig3$`post-pred`[ind]
+mu_sig3$`Prior-pred` <- mu_sig3$`Prior-pred`[ind]
+```
+
+
+
+```{r}
+plot(density(mu_sig3$mu), main = expression("Posterior of µ"[rural]))
+```
+
+## (4) 
+
+Now we consider comparing µ<sub>urban</sub> to µ<sub>rural</sub> and σ<sup>2</sup><sub>urban</sub> to σ<sup>2</sup><sub>rural</sub>. Note the the former is akin to the independent two-sample t-test to comparing means from two populations which is regularly taught in stat 121. The former is not taught in stat 121 because the sampling distribution is beyond the scope of that course. In Bayes, inference for comparing σ<sup>2</sup><sub>urban</sub> to σ<sup>2</sup><sub>rural</sub> follows exactly as before!
+
+### (a) 
+
+Plot the posterior distribution of the difference in the means of the two groups: µ<sub>urban</sub> − µ<sub>rural</sub>. What is the 95% (posterior) credible interval for this difference? What can you conclude?
+
+```{r}
+plot(density(mu_sig2$mu - mu_sig3$mu), main = expression(paste("Posterior of ","µ"[urban],"-","µ"[rural])))
+quantile(mu_sig2$mu - mu_sig3$mu, c(.025, .975))
+```
+
+*Because 0 is not contained in the interval, we can conclude that there seems to be a significant difference between rural and urban means.*
+
+### (b) 
+
+Plot the posterior distribution of the ratio of variances (i.e., of σ<sup>2</sup><sub>urban</sub>/ σ<sup>2</sup> <sub>rural</sub>). What is the 95% posterior credibleinterval for this ratio? What can you conclude?
+
+```{r}
+plot(density(mu_sig2$sig2/mu_sig3$sig2), main = expression(paste("Posterior of ","σ"[urban],"/","σ"[rural])))
+quantile(mu_sig2$sig2/mu_sig3$sig2, c(.025, .975))
+```
+
+*With 1 contained in the interval, we can conclude that there seems to be no difference between rural and urban variance*
+
+## (5) 
+
+Plot the posterior predictive distribution of Y<sub>urban</sub> and the posterior predictive distribution of Y<sub>rural</sub> on the same graph (This of course requires a legend be included in your plot to distinguish one from the other). Obtain an interval for difference in prediction of the urban group relative to the rural. How does this interval compare to that one found in part 4 (a)?
+
+```{r}
+plot(density(mu_sig3$`post-pred`), xlim = c(0,320), main = expression(paste("Posterior Predictives of Y"[rural]," and Y"[urban])), col = "blue")
+lines(density(mu_sig2$`post-pred`), col = "red")
+legend("topright",1, c(expression("Y"[urban]), expression("Y"[rural])), c("red","blue"))
+quantile(mu_sig2$`post-pred` - mu_sig3$`post-pred`, c(.025, .975))
+
+rm(list = ls())
+```
+
+*The prediction intervals are a lot bigger than the posterior intervals. Still does not capture 0 in the interval*
+
+
+
+
+
+
+

@@ -1,0 +1,233 @@
+---
+title: "Homework 9"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+    theme: yeti
+---
+
+Remember to submit your R code along with the completed homework.
+
+## (1) 
+
+A study was done to see if taking a fish oil supplement lowered blood pressure. For the seven subjects, the change in blood pressure was: 8, 12, 10, 14, 2, 0, 0. The study organizers felt it was reasonable to assume the data were conditionally _iid_ and normally distributed with known mean µ = 6.3 and variance σ<sup>2</sup>. For the prior distribution for σ^2, we have chosen an inverse-gamma with shape=2.01 and rate=49.
+
+### (a) 
+
+Derive the posterior distribution of σ<sup>2</sup>. (That is, show that the posterior distribution of σ<sup>2</sup> is an inversegamma)
+
+![](https://raw.githubusercontent.com/tykiww/Bayesian_Analytics/master/stat_251/N-IG-Posterior.jpg)
+
+```{r}
+#SETUP
+rm(list = ls())
+# Packages
+library(invgamma)
+# Data
+fish_oil <- c(8, 12, 10, 14, 2, 0, 0)
+police <- c(17.4, 13.4, 27.3, 25.1, 23.4, 13.6, 38.2, 23.5, 20.7, 28.3)
+urban <- c(197, 199, 214, 217, 222, 223, 227, 228, 234)
+rural <- c(139, 142, 143, 144, 145, 148, 155, 162, 171, 181)
+# Functions
+starval <- function(a,b,y,mu) {
+  n <- length(y)
+  astar <- a + (n/2)
+  bstar <- b + (.5)*sum((y-mu)^2)
+  c('astar' = astar, 'bstar' = bstar)
+}
+
+posp_inv <- function(astar,bstar,y,mu) {
+  astar*log(bstar) + (-.5)*log(2*pi) + 
+    lgamma(astar + .5) -lgamma(astar) - 
+    (astar + .5)*log(bstar + .5*(y - mu)^2) -> yes
+  exp(yes)
+}
+```
+
+### (b)
+
+Refer to part (a). Plot the prior and the posterior distributions for σ<sup>2</sup> on the same graph. Make sure to include a legend to distinguish the prior from the posterior.
+
+```{r}
+# Posterior
+abstar <- starval(2.01,49,fish_oil,6.3)
+seq(0.1,150,length.out = 1000) %>% plot(dinvgamma(seq(0.1,150,length.out = 1000),abstar[1],abstar[2]), 
+                                        type = 'l', col = 'red', xlab = expression(theta), main = "Posterior vs Prior",
+                                        ylab = expression(paste(pi,"(", theta,")", sep = "")))
+# Prior
+seq(0.1,150,length.out = 1000) %>% lines(dinvgamma(seq(0.1,150,length.out = 1000),2.01,49), type = 'l', col = 'forest green')
+legend("topright",c(1,1),c("Posterior","Prior"),c("red","forest green"))
+```
+
+## (2) 
+
+Ten policemen working in downtown Cairo had their blood sampled to determine the level of lead concentration. We assume the data are conditionally _iid_ with the N(µ = 20, σ<sup>2</sup>) distribution. The ten observed data points were: 17.4, 13.4, 27.3, 25.1, 23.4, 13.6, 38.2, 23.5, 20.7, 28.3. The prior for σ<sup>2</sup> is the inverse gamma distribution with shape=4.5 and rate=240 (i.e., σ<sup>2</sup> ∼ IG(4.5, 240)).
+
+### (a) 
+
+Plot the prior and posterior distributions for the variance on the same graph. Make sure to include a legend to distinguish the prior from the posterior.
+
+```{r}
+# Posterior
+abstar <- starval(4.5,240,police,20)
+seq(0.1,350,length.out = 1000) %>% plot(dinvgamma(seq(0.1,350,length.out = 1000), abstar[1], abstar[2]), 
+                                     type = 'l', col = 'red', xlab = expression(theta), main = "Posterior vs Prior",
+                                     ylab = expression(paste(pi,"(", theta,")", sep = "")))
+# Prior
+seq(0.1,350,length.out = 1000) %>% lines(dinvgamma(seq(0.1,350,length.out = 1000),4.5,240), type = 'l', col = 'forest green')
+legend("topright",lty = c(1,1),c("Posterior","Prior"),col = c("red","forest green"))
+```
+
+### (b)
+
+What is the posterior probability that the variance in blood lead concentration of the population of policemen in downtown Cairo is less than 49?
+
+```{r}
+pinvgamma(49,abstar[1],abstar[2])
+```
+
+### (c)
+
+Plot the posterior predictive distribution for the next downtown Cairo police officer’s blood lead concentration
+
+```{r}
+# Monte Carlo
+theta <- rinvgamma(100000,abstar[1],abstar[2])
+signew <- rnorm(100000,20,sqrt(theta))
+# Exact
+prp <- sapply(-20:60, function(x) posp_inv(abstar[1],abstar[2],x,20))
+
+# plot both.
+par(mfrow= c(1,2))
+plot(density(signew), main = "Posterior Predictive Distribution", xlab = 'y (MC)') ; legend(1000,.00215, "MC")
+plot(-20:60,prp, type = 'l', ylab = "Density", xlab = "y (Exact)", main = "for Cairo Police blood lead Conc.") 
+par(mfrow= c(1,1))
+```
+
+## (3) 
+
+Here is the total serum cholesterol for 9 urban residents of Guatemala: 197, 199, 214, 217, 222, 223, 227, 228, 234. It is assumed that Y<sub>urban</sub>,i|σ<sup>2</sup> <sub>urban</sub> iid ∼ N(µ<sub>urban</sub> = 220, σ<sup>2</sup> <sub> urban </sub>), where Yurban,i denotes the total serum cholesterol for the ith individual in the sample of Guatemalan urban residents. The prior belief about σ<sup>2</sup> <sub>urban</sub>, the variance of the serum cholesterol of urban residents of Guatemala, is that it has an inverse gamma distribution with shape=2.5 and rate=600.
+
+### (a) 
+
+What is the posterior distribution of the variance in this case?
+
+```{r}
+(abstar <- starval(2.5,600,urban,220))
+```
+
+### (b) 
+
+What is the prior expected value of σ<sup>2</sup> <sub>urban</sub>?
+
+```{r}
+600/(2.5-1)
+```
+
+
+### (c) 
+
+What is the posterior expected value of σ<sup>2</sup> <sub>urban</sub>?
+
+```{r}
+abstar[2]/(abstar[1] - 1)
+```
+
+
+### (d) 
+
+What is the posterior mode of σ<sup>2</sup> <sub>urban</sub>?
+
+```{r}
+abstar[2]/(abstar[1] + 1)
+```
+
+
+### (e) 
+
+Plot the posterior and prior distribution of σ<sup>2</sup> <sub>urban</sub> on the same graph. Make sure to include a legend to distinguish the prior from the posterior.
+
+```{r}
+seq(0,1000) %>% plot(dinvgamma(seq(0,1000),abstar[1],abstar[2]),  type = 'l', 
+                     col = 'red', xlab = expression(theta), main = "Posterior vs Prior", 
+                     ylab = expression(paste(pi,"(", theta,")", sep = "")))
+seq(0,1000) %>% lines(dinvgamma(seq(0,1000),2.5,600), type = 'l', col = "forest green")
+legend("topright",c(1,1),c("Prior","Posterior"),c("forest green","red"))
+```
+
+## (4) 
+
+Here is the total serum cholesterol for 10 rural residents of Guatemala: 139, 142, 143, 144, 145, 148, 155, 162, 171, 181. It is assumed that Yrural,i|σ<sup>2</sup><sub>rural</sub> iid∼ N(µ<sub>rural</sub> = 150, σ<sup>2</sup> <sub>rural</sub>), where Y<sub>rural</sub>,i denotes the total serum cholesterol for the ith individual in the sample of Guatemalan rural residents. The prior belief about the variance of serum cholesterol in rural Guatemalan residents is an inverse gamma with shape=2.5 and rate = 600.
+
+### (a) 
+
+What is the posterior distribution of the variance in this case?
+
+```{r}
+(abstar <- starval(2.5,600,rural,150))
+```
+
+### (b) 
+
+Plot the posterior.
+
+```{r}
+seq(0,1000) %>% plot(dinvgamma(seq(0,1000),abstar[1],abstar[2]),  type = 'l', 
+                     col = 'red', xlab = expression(theta), main = "Posterior distribution for rural serum cholesterol", 
+                     ylab = expression(paste(pi,"(", theta,")", sep = "")))
+```
+
+## (5) 
+
+Now consider the ratio of variances of the two groups: σ<sup>2</sup><sub>urban</sub>/σ<sup>2</sup><sub>rural</sub>.
+
+### (a) 
+
+Plot the (Monte Carlo-estimated) posterior distribution of σ<sup>2</sup><sub>urban</sub>/σ<sup>2</sup><sub>rural</sub>.
+
+```{r}
+# distributions
+abstar_u <- starval(2.5,600,urban,220)
+abstar_r <- starval(2.5,600,rural,150)
+# Monte Carlo Plotting.
+(post_dist <- rinvgamma(10000,abstar_u[1],abstar_u[2])/
+  rinvgamma(100000,abstar_r[1],abstar_r[2])) %>% density %>% 
+  plot(main = expression(paste("Posterior Distribution of ",σ^2,""[urban],"/",σ^2,""[rural])))
+```
+
+### (b) 
+
+Report and interpret a 95% posterior credible interval for this ratio.
+
+```{r}
+cred <- quantile(post_dist,c(.025,.975))
+paste("After considering the prior and our data, the proportion of serum cholesterol variances between urban and rural residents of Guatemala is between ",round(cred[1],4)," and ",round(cred[2],4)," with 95% posterior probability.", sep = "" )
+```
+
+*This indicates that there is no difference in the two serum cholesterol variances of urban and rural residents of guatemala*
+
+### (c)
+
+Explain why it is important to determine whether the CI for the ratio of variances includes 1. (Hint: What does it imply if the ratio equals 1?)
+
+*If the ratio equals 1, we cannot conclude that the population variances differ. Essentially an F-distribution*
+
+## (6) 
+
+Plot the prior predictive distribution of Y<sub>urban</sub> and the posterior predictive distribution of Y<sub>urban</sub> on the same graph. (This of course requires a legend be included in your plot to distinguish one from the other.)
+
+```{r}
+abstar <- starval(2.5,600,urban,220)
+# Posterior predictive
+post_prp <- sapply(seq(0,400,length.out = 1000), function(x) posp_inv(abstar[1],abstar[2],x,220))
+plot(seq(0,400,length.out = 1000),post_prp, type = 'l', col = 'red', main = "Predictive Distributions",xlab = expression("y"[new]),ylab =expression(paste("f(y"[new],")")))
+# Prior predictive
+prior_prp <- sapply(seq(0,400,length.out = 1000), function(x) posp_inv(2.5,600,x,220))
+lines(seq(0,400,length.out = 1000),prior_prp, type = 'l', col = 'forest green')
+legend("topright",c(1,1),c("Prior","Posterior"),c("forest green","red"))
+rm(list = ls())
+```
+
+
+
