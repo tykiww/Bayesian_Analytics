@@ -1,0 +1,109 @@
+---
+title: "Waiting for My Payment to Process.."
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+---
+
+Analytically, time between a poisson process happens to be derived as an exponential distribution (e.g. Time that it takes for a car to pass an intersection, time between avalanches in December). We will be using a Bayesian technique to model exponentially distributed information.
+
+![](https://pbs.twimg.com/media/BrEN52WCUAA4wdV.png)
+
+### Case
+
+Analysis of credit card processing times.
+
+Part of customer service is to minimize time to delivery for any product or transaction. If payments are taking too long to be delivered to a customer, reliability becomes an issue. We will be looking at payment processing times for an unknown bank so we can model, to the best of our ability, the true distribution of the company's processing times.
+
+### EDA
+
+Data is stored in a repository and may be retrieved by the link below. 
+
+```{r}
+path <- "https://raw.githubusercontent.com/tykiww/projectpage/master/datasets/credit_wait/cred_process.csv"
+wait <- read_csv(path)[,-1] %>% unlist ; rm(path)
+hist(wait)
+```
+
+Observing the histogram above, we notice an exponential pattern. However, we can't be certain! Since we aren't sure, we will run it through the KS test to check. The process to do this is by passing the data in the `fitdistr()` function and obtaining the *lambda* value. This value will help us determine the exact exponential distribution of interest (usually the standard exponential lambda is 1). A p-value above 0.05 will confirm the null hypothesis of being "exponential".
+
+```{r}
+fits <- fitdistr(wait,"exponential")
+# goodness of fit test
+ks.test(wait, "pexp", fits$estimate) # not refused, seems exponential.
+```
+
+### Model
+
+Now that we have confirmed the approximate distribution, let's move on to building our model. Since our data is exponential, the conjugate prior distribution is a gamma. This is because the exponential distribution is a special case of the gamma where a = 1 and b = 1/lambda (this follows true even for the weibull distribution). In that way, our posteriors are derived as [such](http://halweb.uc3m.es/esp/Personal/personas/mwiper/docencia/English/PhD_Bayesian_Statistics/ch3_2009.pdf):
+
+
+    a* = a + n
+    b* = b + sum(data) (b as rate)
+
+
+We will move on to specify our prior distributions. We notice that the more data we have, astar gets bigger. However, what seems to stretch the distribution is the `b + sum(data)`. Another way we may re-write the sum would be by taking the average and multiplying it by the length: `b + n*mean(data)`. This means that our b should be a bit larger than our mean by a factor of the data length. We may do a method of moments to decipher a likely value for a and b (assuming mean is about 8). Usually, it may be safe to just specify 0.01 for both a and b. However, we are more afraid of a type 1 error. to avoid this situation, we will enlargen our tail value at risk by specifying b to be a significantly larger value than so the data average will be closer to 30 minutes.
+
+```{r}
+a <- .1 ; b <- 3
+```
+
+Our plot for the prior looks like a very tight distribution.
+
+```{r}
+plot(seq(0,.5,length = 1000),dgamma(seq(0,.5,length = 1000),a,b), type = 'l', col = "blue")
+```
+
+Now, we will move on to creating our posterior values. Since our prior is a gamma, our posterior will also be a gamma. Let's build a function that takes in our parameters of the data, a, and b to create posterior parameters.
+
+```{r}
+abstar <- function(a,b,y) {
+  n <- length(y)
+  astar <- a + n
+  bstar <- b + sum(y) # or b + n*mean(y)
+  c("a*" = astar, "b*" = bstar)
+}
+
+(starval <- abstar(a,b,wait))
+```
+
+Even from the posteriors, we can already tell that the mean of the data is around 10. We will now move on to plotting our new posterior.
+
+```{r}
+plot(seq(0,.2,length = 1000),dgamma(seq(0,.2,length = 1000),starval[1],starval[2]), type = 'l', col = "blue")
+```
+
+Now let's see what the posterior probability of observing a wait time of 15 minutes or less is...
+
+```{r}
+dgamma(1/15,starval[1],starval[2])
+```
+
+Now that we have our supposed distribution, let's generate our posterior predictive. The process is the same with any univariate conjugate distribution.
+
+```{r}
+# posterior predictive
+theta <- rgamma(10000,starval[1],starval[2])
+ynew <- rexp(10000,theta)
+quantile(ynew,c(.025, .975))
+```
+
+Finding probabilities from the distribution is just as easy. If our value at risk (12 minutes) determined the threshold for customer satisfaction, how many of our customers are actually dissatisfied?
+
+```{r}
+mean(ynew >= 12)
+```
+
+With a 30% predictive probability that the next customer will be unsatisfied, we have a lot more work to do. From here, it will be our time to come up with a solution to that problem.
+
+### Conclusion
+
+Measuring time is always arduous and requires patience. However, there is much information that can be gleaned from this task. Now we have something close to the "true" distribution of payment wait times. Some assumptions to note is that many people oftentimes use the exponential distribution just because it is a common shape. However, we must remember that the derivation holds true for wait times between a poisson process. Otherwise, we cannot be sure if the true value really is an exponential. Give this a try with a type of wait time process on your next proejct!
+
+
+
+
+
+
+
