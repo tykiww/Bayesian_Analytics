@@ -1,0 +1,300 @@
+---
+title: "Pima Indian Woman Regression"
+output: html_notebook
+---
+
+
+How does bmi impact blood pressure?
+  - X = BMI, Y = BP
+  - Subject 1 - (Y1,X1) Simple Linear Regression
+  - Subject n - (Yn,Xn) Multiple Regression
+
+```{r}
+# Packages & Data
+library(MASS)
+library(invgamma)
+library(dplyr)
+bmi <- Pima.tr$bmi
+bp <- Pima.tr$bp
+```
+
+
+## EDA
+
+We notice a bit of noise in the data. Correlation not super strong, but something positive.
+
+```{r}
+plot(bmi, bp, pch = 20, cex = 2)
+cor(bmi,bp)
+```
+
+Are assumptions met? (LINE)
+  - 1. Linearity seems low, but it seems reasonable.
+  - 2. E(error) = 0 centered at 0 (Normally distributed error terms) 
+  - 3. V(error) is constant (homoscedastic)
+  - 4. Independence
+  - 2,3,4 can be described as N ~iid N(0,sig^2) (This item specifies the likelihood)
+
+Least Squares Regression Line (no assumptions of the distributions)
+
+```{r}
+fr <- lm(bp ~ bmi)
+summary(fr) # p-value comes from independence and normality. There is an association.
+plot(bmi, bp, pch = 20, cex = 2)
+abline(fr, col = 'red', lwd=2)
+```
+
+## Bayesian
+
+However, for bayesian, we need a likelihood!!
+
+  - p-value becomes the probability of rejecting the null instead of probability of observing 
+  - a test statistic as extreme or more extreme than what we have observed given the null hypothesis
+  - Hypothesiss are not useful for the bayesian perspective..
+
+We have 3 parameters for the model. B[0], B[1], and σ^2
+
+    Yi = ß + ß1Xi + ei (ß[0]+ß[1] is the mean!!)
+      - likelihood is given by...
+        - Yi| ß[0],ß[1],σ^2 ~ N(ß[0] + ß[1]Xi,σ^2)
+        - f(Y1, ..., Yn| ß[0],ß[1],σ^2)
+        - product of varying means!
+
+
+  - OUR END GOAL IS... π(B[0], B[1], σ^2 | y1, ..., yn) Posterior of unknowns given a joint!
+  - That is proportional to... f(y1, ..., Yn | B[0], B[1],σ^2) X π(B[0], B[1], σ^2) 
+  - Which is proportional to... f(y1, ..., Yn | B[0], B[1],σ^2) X π(B[0]) X π(B[1]) X π(σ^2)
+  
+  - A priori, we have 3 separate priors on each parameter. We will use a posterior dist. for each one!
+    - What kind of priors to stick in?  
+      - π(B[0]) --> Can be a normal. ~ N(m[0],v[0])
+        - m[0] = 80 (from experience), v[0] = 400
+      - π(B[1]) --> Can be a normal. ~ N(m[1],v[1])
+        - m[1] = 0 (average of beta 1), v = 9 (better to aire on the side of uncertain relative to certainty)
+      - π(σ^2) ---> Probably IG ~ IG(a,b)
+        - a = 1, b = 1 (start it here, and see how influential it is, usually not unless variance is tight)
+  
+
+Evaluating a 3Dimensional integral.
+
+  - Gibbs Sampler since π(B[0], B[1], σ^2 | y1, ..., yn) not available theoretically (in closed form)
+    - 1) Specify starting values ß[0], ß[1], σ^2
+    - 2) Update each one sequentially using
+      - π(B[0] | B[1], σ^2 , y1, ..., yn) 
+      - π(B[1] | B[0], σ^2   y1, ..., yn)
+      - π(σ^2  | B[0], B[1], y1, ..., yn)
+
+```{r}
+mcmc.regression <- function(J, burn, thin,y, x, m0,v0,m1,v1,a,b, x0){
+
+  # The ols linear model
+  fr <- lm(y~x)
+  
+  n <- length(y)
+  # Starting values
+  beta0 <- c(fr$coefficients[1]) %>% as.numeric
+  beta1 <- c(fr$coefficients[2]) %>% as.numeric
+  sigma2 <- c(summary(fr)$sigma^2) %>% as.numeric
+  # For Error plots.
+  fitted_line <- matrix(NA, nrow=J, ncol=length(y))
+  post_pred_line <- matrix(NA, nrow=J, ncol=length(x0))
+  
+  
+  
+  out <- NULL
+
+
+	for(i in 2:J){
+		# update beta0
+		s2star <- 1/((n/sigma2[i-1]) + 1/v0)
+		mstar <- s2star*((1/sigma2[i-1])*sum(y - beta1[i-1]*x) + (1/v0)*m0)	
+		beta0[i] <- rnorm(1, mstar, sqrt(s2star))
+
+		# update beta1
+		sumx2 <- sum(x^2)
+		s2star <- 1/((1/sigma2[i-1])*sumx2 + 1/v1)
+		mstar <- s2star*((1/sigma2[i-1])*sum(x*(y-beta0[i])) + (1/v1)*m1)
+		beta1[i] <- rnorm(1, mstar, sqrt(s2star))
+		
+		#update sigma2
+		astar <- 0.5*n + a
+		bstar <- 0.5*sum((y - (beta0[i] + beta1[i]*x))^2) + 1/b
+		sigma2[i] <- rinvgamma(1, shape=astar, rate=bstar)
+		
+		# Fit line
+		fitted_line[i,] <- beta0[i] + beta1[i]*x
+		# posterior predictive
+		post_pred_line[i,] <- sapply(x0, function(x) rnorm(1, beta0[i] + beta1[i]*x, sqrt(sigma2[i])))
+	}
+
+	keep <- seq(burn+1, J, by=thin)
+	list("beta0" = beta0[keep],"beta1" = beta1[keep], "sigma2" = sigma2[keep], 
+	     "post_pred_line" = post_pred_line[keep,], "fitted_line" = fitted_line[keep,]	)
+	
+
+
+}
+
+x0 <- seq(min(bmi), max(bmi), length=100)
+samp <- mcmc.regression(100000, burn=10, thin=100, y=bp, x=bmi, 
+						m0=80, v0=400, m1=0, v1=9, a=1, b=1,
+						x0=x0)
+```
+
+*Burning and thinning can be assessed by trace plots and acf plots.. If you forgot how to do those, look at the MCMC notes*
+
+Now we will plot fitted regression lines
+
+```{r}
+
+bmivals <- seq(min(bmi), max(bmi), length = 100)
+poster_mean_line <- mean(samp$beta0) + mean(samp$beta1)*bmivals
+plot(bmi, bp)
+lines(bmivals, poster_mean_line, col = 'red', lwd = 3) # two ways to plot the bayes slope!
+abline(c(mean(samp$beta0), mean(samp$beta1)), col = "green")
+# ols fitted line
+abline(lm(bp~bmi), col = 'blue') # OLS line is steeper!
+```
+
+### Credible Interval for Regression Lines
+
+There is a nice scatter in the data indicating that constant variance is reasonable.. So we should be okay to include bands.. Be careful!
+
+*2 methods:*
+
+Independently take the expectation.
+
+```{r}
+b0ci <- quantile(samp$beta0, c(0.025, 0.975))
+b1ci <- quantile(samp$beta1, c(0.025, 0.975))
+post_line_025 <- b0ci[1] + b1ci[1]*bmivals
+post_line_975 <- b0ci[2] + b1ci[2]*bmivals
+plot(bmi, bp)
+lines(bmivals, poster_mean_line, col='red', lwd=3)
+lines(bmivals, post_line_025, col='red', lwd=3, lty=2)
+lines(bmivals, post_line_975, col='red', lwd=3, lty=2)
+```
+
+
+Take the Linearity of Expectation as ß + ß1Xi together! 
+(Changes with the data so need to order accordingly!)
+The bands are wider where there is less data. 
+
+```{r}
+post_line_ci <- apply(samp$fitted_line,2,function(x) quantile(x, c(0.025, 0.975)))
+plot(bmi, bp)
+lines(bmi[order(bmi)], apply(samp$fitted_line,2,mean)[order(bmi)], col='red', lwd=3)
+lines(bmi[order(bmi)], post_line_ci[1,order(bmi)], col='red', lwd=3, lty=2)
+lines(bmi[order(bmi)], post_line_ci[2,order(bmi)], col='red', lwd=3, lty=2)
+```
+
+
+```{r}
+View(samp$post_pred_line)
+```
+
+### Posterior Predictives and Intervals *HELP*
+
+```{r}
+# Prediction line and interval
+plot(bmi, bp)
+post_pred_ci <- apply(samp$post_pred_line,2,function(x) quantile(x, c(0.025, 0.975)))
+lines(x0, apply(samp$post_pred_line,2,mean), col='red', lwd=3)
+lines(x0, post_pred_ci[1,], col='red', lwd=3, lty=2)
+lines(x0, post_pred_ci[2,], col='red', lwd=3, lty=2)
+
+
+
+# has 95% of the datapoints!! (doesn't look very pretty.)
+# if you increase the density of the x grid and mcmc draws, it will be more smooth!
+```
+
+### Comparing Populations
+
+
+```{r}
+samp1No <- mcmc.regression(100000, burn = 10, thin = 100, y = bp[Pima.tr$type=="No"], x = bmi[Pima.tr$type=="No"],
+                         m0 = 80, v0 = 400, m1 = 0, v1 = 9, a = 1, b = 1, x0 = NULL)
+
+
+samp1Yes <- mcmc.regression(100000, burn = 10, thin = 100, y = bp[Pima.tr$type=="Yes"], x = bmi[Pima.tr$type=="Yes"],
+                         m0 = 80, v0 = 400, m1 = 0, v1 = 9, a1, b1, x0 = NULL)
+
+par(mfrow = c(2,2))
+hist(samp1No$beta1)
+hist(samp1Yes$beta1)
+hist(samp1No$beta1 - samp1Yes$beta1)
+par(mfrow = c(1,1))
+quantile(samp1No$beta1 - samp1Yes$beta1, c(0.025, 0.975)) # no difference between diabetes and no diabetes.
+```
+
+
+### Same approach using Multi-variate Normal
+
+```{r}
+## update beta0 and beta1 simultaneously (from multivariate normal!)
+# no need to worry about beta0 beta1 autocorrelation.
+
+mcmc.regression.block <- function(J, burn, thin,y, x, mvec,Vmatrix,a,b){
+	
+	require(mvtnorm)
+	require(invgamma)
+	out <- NULL
+	
+	betas <- matrix(NA, nrow=J, ncol=2)
+	sigma2 <- numeric()
+	betas[1,] <- mvec
+	sigma2[1] <- 1
+
+	
+	n <- length(y)
+	Xmat <- cbind(1, x)
+  	
+  	for(j in 2:J){
+  		# update both beta0 and beta1
+		Vstar <- solve((1/sigma2[j-1]) * t(Xmat)%*%Xmat + solve(Vmatrix))
+		mstar <- Vstar %*% (1/sigma2[j-1] * t(Xmat)%*%y + solve(Vmatrix)%*% mvec)
+		betas[j,] <- as.vector(rmvnorm(1, mstar, Vstar))
+
+		# update sigma2
+		astar <- a + n/2
+		bstar <- b + 1/2 * crossprod(y - Xmat%*%betas[j,])
+ 		sigma2[j] <- rinvgamma(1, shape=astar, rate=bstar)
+	}
+	keep <- seq(burn+1, J, by=thin)
+	
+	out$beta <- betas[keep,]
+	out$sigma2 <- sigma2[keep]	
+	out
+	
+}
+
+samp.block <- mcmc.regression.block(J=1000, burn=0, thin=1, y=bp, x=bmi,
+										mvec=c(80,0), Vmatrix=diag(c(400,9)),
+										a=1, b=1)
+par(mfrow=c(2,2))
+plot(samp.block$beta[,1], type='l')										
+plot(samp.block$beta[,2], type='l')										
+plot(samp.block$sigma2, type='l')										
+acf(samp.block$beta[,2])
+
+samp <- mcmc.regression(J=1000, burn=0, thin=1, y=bp, x=bmi, 
+						m0=80, v0=400, m1=0, v1=9, a=1, b=1)
+
+quartz()
+par(mfrow=c(2,2))
+plot(samp$beta0, type='l')										
+plot(samp$beta1, type='l')										
+plot(samp$sigma2, type='l')										
+acf(samp$beta1)
+```
+
+
+
+
+
+
+
+
+
+
