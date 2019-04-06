@@ -1,0 +1,237 @@
+---
+title: "Crime"
+author: "Steven & Tyki"
+date: "3/28/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+path <- "https://raw.githubusercontent.com/tykiww/projectpage/master/datasets/crime_rates/CrimeStatebyState2.csv"
+crime <- read_csv(path, skip=9)
+clean <- select(crime, -`X23`, -`Revised rape rate /2`, -`Revised rape /2`) %>% na.omit
+```
+
+```{r}
+head(clean)
+```
+
+```{r}
+violent <- clean$"Violent crime total"
+property <- clean$"Property crime total"
+```
+
+```{r}
+ind_violent <- as.numeric(violent[1:31])
+mis_violent <- as.numeric(violent[33:length(violent)])
+ind_property <- as.numeric(property[1:31])
+mis_property <- as.numeric(property[33:length(property)])
+```
+
+```{r}
+mean(ind_violent)
+mean(mis_violent)
+mean(ind_property)
+mean(mis_property)
+```
+
+
+```{r}
+plot(1984:2014, mis_property, type='l', col='red', main = "Property Crime count (1985:2014)", xlab = "Years", ylab = "Property Crime Count", lwd = 3)
+lines(1984:2014, ind_property, type='l', lwd = 3)
+legend("topright",c("Missouri","Indiana"), col = c("red","black"), lwd = 3)
+```
+
+```{r}
+rbind(summary(mis_property),summary(ind_property)) %>% as_tibble
+```
+
+
+
+Going with property because those look more similar
+```{r}
+missouri <- mis_property
+indiana <- ind_property
+print('Missouri')
+paste0('Min: ', min(missouri), ', Mean: ', mean(missouri), ', Max: ', max(missouri))
+print('Indiana')
+paste0('Min: ', min(indiana), ', Mean: ', mean(indiana), ', Max: ', max(indiana))
+```
+
+Selecting priors (assuming nothing)
+```{r}
+a <- 1
+b <- 1
+```
+
+```{r}
+y_mis <- sum(missouri)
+y_ind <- sum(indiana)
+n_mis <- length(missouri)
+n_ind <- length(indiana)
+
+astar_mis <- a + y_mis
+bstar_mis <- b + n_mis
+
+astar_ind <- a + y_ind
+bstar_ind <- b + n_ind
+```
+
+Expected Value for each posterior
+```{r}
+paste0('Missouri: ', round(astar_mis / bstar_mis, 4))
+paste0('Indiana: ', round(astar_ind / bstar_ind, 4))
+```
+
+Credible Intervals
+```{r}
+cred_int_mis <- round(qgamma(c(.025, .975), astar_mis, rate=bstar_mis), 4)
+cred_int_ind <- round(qgamma(c(.025, .975), astar_ind, rate=bstar_ind), 4)
+
+paste0('There is a 95% probability that the true number of property crimes in Missouri in a given year is between ', cred_int_mis[1], ' and ', cred_int_mis[2], '.')
+paste0('There is a 95% probability that the true number of property crimes in Indiana in a given year is between ', cred_int_ind[1], ' and ', cred_int_ind[2], '.')
+```
+
+Plot the posteriors
+```{r}
+theta <- seq(206000, 213000, length=10000)
+plot(theta, dgamma(theta, shape=astar_mis, rate=bstar_mis), type='l', xlab=expression(theta), ylab=expression(pi(theta)), lwd=3, main='Posterior Property Crime', ylim=c(0,.01), xlim=c(205000, 215000))
+lines(theta, dgamma(theta, shape=astar_ind, rate=bstar_ind), lwd=3, col='red')
+legend('topright', c('Missouri', 'Indiana'), col = c('black', 'red'), lwd = 3)
+```
+
+Differences
+```{r}
+diffs <- rgamma(100000, astar_mis, bstar_mis) - rgamma(100000, astar_ind, bstar_ind)
+paste0('The expected difference between the number of property crimes between Missouri and Indiana in a given year is ', round(mean(diffs), 4), '.')
+```
+
+Credible interval for differences
+```{r}
+cred_int_diff <- round(quantile(diffs, c(.025, .975)), 4)
+paste0('There is a 95% probability that the difference between the number of property crimes in Missouri and Indiana in a given year is between ', cred_int_diff[1], ' and ', cred_int_diff[2], '.')
+```
+
+Plot posterior differences
+```{r}
+plot(density(diffs), main='Posterior Difference', xlab='Difference')
+```
+
+Posterior Predictive
+```{r}
+theta <- rgamma(100000, astar_mis, bstar_mis)
+ynew_mis <- rpois(100000,theta)
+
+theta <- rgamma(100000, astar_ind, bstar_ind)
+ynew_ind <- rpois(100000,theta)
+```
+
+Plot the posterior predictives
+```{r}
+plot(density(ynew_mis), main='Missouri Posterior Predictive', xlab='Property Crimes')
+plot(density(ynew_ind), main='Indiana Posterior Predictive', xlab='Property Crimes')
+```
+
+Try out some probabilities
+```{r}
+mean(ynew_mis > 211000)
+mean(ynew_ind > 211000)
+```
+
+```{r}
+mean(ynew_mis > 206500)
+mean(ynew_ind > 206500)
+```
+
+# Choose a new prior with method of moments
+From the original plot of the data, it looks like they both have means around 215000 and it seems reasonable that the actual means could be plus or minus 5000 from that. So we will say 1 standard deviations is 5000. Now we want to find a and b such that the mean is 215000 and the sd is 2500.
+
+System of Equations
+mu = a/b and sigma = sqrt(a)/b
+215000 = a/b and 5000 = sqrt(a)/b
+a = 215000b
+So 5000 = sqrt(215000b)/b
+5000 = sqrt(215000) / sqrt(b)
+sqrt(b) = sqrt(215000) / 5000
+b = 215000 / (5000^2)
+Then a = 215000 * 215000 / (5000^2)
+```{r}
+b <- 215000 / (5000^2)
+a <- 215000 * 215000 / (5000^2)
+paste0('a=', a, ' and b=', b)
+```
+
+Test that these work
+```{r}
+paste0('Mean: ', a/b, ' and sd: ', sqrt(a)/b)
+```
+
+New Posteriors
+```{r}
+y_mis <- sum(missouri)
+y_ind <- sum(indiana)
+n_mis <- length(missouri)
+n_ind <- length(indiana)
+
+astar_mis <- a + y_mis
+bstar_mis <- b + n_mis
+
+astar_ind <- a + y_ind
+bstar_ind <- b + n_ind
+```
+
+Expected Value
+```{r}
+paste0('Missouri: ', round(astar_mis / bstar_mis, 4))
+paste0('Indiana: ', round(astar_ind / bstar_ind, 4))
+```
+
+Credible Intervals
+```{r}
+cred_int_mis <- round(qgamma(c(.025, .975), astar_mis, rate=bstar_mis), 4)
+cred_int_ind <- round(qgamma(c(.025, .975), astar_ind, rate=bstar_ind), 4)
+
+paste0('There is a 95% probability that the true number of property crimes in Missouri in a given year is between ', cred_int_mis[1], ' and ', cred_int_mis[2], '.')
+paste0('There is a 95% probability that the true number of property crimes in Indiana in a given year is between ', cred_int_ind[1], ' and ', cred_int_ind[2], '.')
+```
+
+Plot the posteriors and the prior (same for both)
+```{r}
+theta <- seq(200000, 230000, length=10000)
+plot(theta, dgamma(theta, shape=astar_mis, rate=bstar_mis), type='l', xlab=expression(theta), ylab=expression(pi(theta)), lwd=3, main='Posterior Property Crime', ylim=c(0,.005), xlim=c(200000, 230000))
+lines(theta, dgamma(theta, shape=astar_ind, rate=bstar_ind), lwd=3, col='red')
+lines(theta, dgamma(theta, shape=a, rate=b), lwd=3, col='gray')
+legend('topright', c('Missouri', 'Indiana', 'Prior'), col = c('black', 'red', 'gray'), lwd = 3)
+```
+
+
+Differences
+Expected Value
+```{r}
+diffs <- rgamma(100000, astar_mis, bstar_mis) - rgamma(100000, astar_ind, bstar_ind)
+paste0('The expected difference between the number of property crimes between Missouri and Indiana in a given year is ', round(mean(diffs), 4), '.')
+```
+
+Credible Interval
+```{r}
+cred_int_diff <- round(quantile(diffs, c(.025, .975)), 4)
+paste0('There is a 95% probability that the difference between the number of property crimes in Missouri and Indiana in a given year is between ', cred_int_diff[1], ' and ', cred_int_diff[2], '.')
+```
+
+Direct Comparison
+
+```{r}
+mean(rgamma(100000, astar_mis, bstar_mis) > rgamma(100000, astar_ind, bstar_ind))
+```
+
+
+Plot Posterior Differences
+```{r}
+plot(density(diffs), main='Posterior Difference', xlab='Difference')
+```
+
