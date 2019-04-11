@@ -1,0 +1,182 @@
+---
+title: "Homework 12"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+---
+
+
+In this homework we will demostrate the the M-H algorithm works and employ it in modeling scenario where it is required. Remember to submit your R code along with the completed homework.
+
+
+```{r, echo = FALSE, results = FALSE}
+library(dplyr)
+```
+
+## (1) 
+
+In this part of the homework we will demonstrate that the Metropolis algorithm works. To do this, we will use the Metropolis algorithm in a situation where it is unnecessary to do so. Recall problem 2 of homework 8 where you considered the total serum cholesterol for eight urban residents of Guatemala:
+
+```{r}
+cholest.u <- c(197, 199, 214, 217, 222, 227, 228, 234)
+```
+
+For this problem we assumed that the population variance of serum cholesterol measurements for <sub>urban</sub> residents of Guatemala was known to be σ <sup>2</sup> = 260. We also assumed that the population mean, µ<sub>urban</sub>, should follow a Normal distribution with a mean of m = 180 and a variance of v = 90. Recall that in this setting the posterior distribution is know to be a Normal distribution with mean and variance
+
+  - mstar = (nvybar + σ<sup>2</sup>m) / (nv+ σ<sup>2</sup>)
+  - vstar = (vσ<sup>2</sup>) / (nv+ σ<sup>2</sup>)
+
+### (a) 
+
+Draw 100,000 observations from the posterior distribution for µ using the Metropolis algorithm. Show
+that the algorithm has converged using a history or trace plot. Show that the algorithm mixes well using
+an auto-correlation plot.
+
+```{r}
+# prior N(150,90)
+m <- 180 ; v <- 90 ; sig2 <- 260
+ybar <- mean(cholest.u)
+# starting values
+x <- c(ybar) %>% as.numeric
+vv <- 20 # if we run this long enough, we should be okay.. but let's just be safe..
+
+J <- 100500
+
+for (j in 2:J) {
+  # sample xp from the proposal distribution (use random normal!)
+  # symmetric as x[j-1] and xp could be switched and it doesn't matter!
+  xp <- rnorm(1,x[j-1],sqrt(vv))
+  
+  # Target Distribution is Normal so use dnorm!
+  #gxc <- prod(dnorm(cholest.u, x[j-1],var(sig2))) * dnorm(x[j-1],m,sqrt(v)) Takes too much time..
+  #gxp <- prod(dnorm(cholest.u, xp,var(sig2))) * dnorm(xp,m,sqrt(v))
+  
+  # Best thing is to put everything to the log scale
+  gxc <- sum(dnorm(cholest.u, x[j-1],sqrt(sig2), log = TRUE)) + dnorm(x[j-1],m,sqrt(v), log = TRUE)
+  gxp <- sum(dnorm(cholest.u, xp,sqrt(sig2), log = TRUE)) + dnorm(xp,m,sqrt(v), log = TRUE)
+  
+  # make sure proportion is not greater than 1
+  
+  # compute the probability of accepting the proposed value of alpha
+  alpha <- min(c(1, exp(gxp - gxc))) 
+  # bernoulli between 0 and 1
+  purrr::rbernoulli(1, alpha) %>% 
+    ifelse(xp, x[j-1]) -> x[j]
+  rm(alpha, gxc,gxp, xp)
+  
+  # For uniform comparison...
+  # x[j] <-ifelse(runif(1,0,1) < alpha, xp, x[j-1])
+  # For binomial comparison...
+  # rbinom(1,1,alpha) %>% as.logical() %>% 
+  #   ifelse(xp, x[j-1]) -> x[j]
+  
+} 
+```
+
+```{r, echo = FALSE, results = FALSE}
+gc(FALSE,TRUE)
+```
+
+
+```{r}
+
+keep <- seq(501,100000, by = 10)
+
+plot(x[keep], type = 'l') 
+acf(x[keep]) # Not too bad..
+```
+
+### (b)
+
+Plot the approximate posterior distribution using a histogram and the 100,000 draws. In the same plot, add the theoretical posterior distribution using the dnorm function
+
+```{r}
+starval <- function(m,v,y,sig2) {
+  n <- length(y); ybar <- mean(y)
+  mstar <- (n*v*ybar + sig2*m) / (n*v + sig2)
+  s2star <- v*sig2 / (n*v + sig2)
+  
+  c("m*" = mstar, "s2*" = s2star)
+}
+
+(mvstar <- starval(m,v,cholest.u,sig2))
+
+hist(x,freq = FALSE, main = expression("Density of µ"[urban]), col = "honeydew")
+xax <- seq(160,240, length.out = 1000)
+lines(xax,dnorm(xax,mvstar[1],sqrt(mvstar[2])), col = "steel blue") # assessment.
+```
+
+## (2) 
+
+Now relax the assumption that σ<sup>2</sup> is known and assume that σ<sup>2</sup> ∼ UN(0, 500) where UN denotes a uniform distribution. For µ use the prior distribution from the previous problem. As before, the joint posterior distribution for (µ, σ<sup>2</sup>) is not available in closed form. Therefore, we will sample from it. To do this, we will merge the Gibbs sampler and Metropolis algorithm. The Gibbs sampler will be used to sample µ using the full conditional distribution of µ and the Metropolis algorithm will be used to sample σ<sup>2</sup> since the full conditional of σ<sup>2</sup> is not of recognizable form. Doing what was just described, collect 10,000 draws from the joint posterior distribution from (µ, σ<sup>2</sup>). 
+
+```{r}
+rm(sig2, xax, j)
+# Assume that sig2 is UN(0,500)
+
+# Necessary values
+n <- length(cholest.u)
+m <- 180; v <- 90
+vv <- 250 # keep in mind that variance of data is around 180, so we can't let it get to 0
+# set starting values for mu and sig2
+mu <- c(ybar) %>% as.numeric
+sig2 <- c(var(cholest.u)) %>% as.numeric
+J <- 100500
+
+for (i in 2:J) {
+    
+    # Gibbs Sampler..
+    mstar <- ((n * v * ybar) + (m * sig2[i-1])) / (n * v + sig2[i-1])
+    vstar <- (v * sig2[i-1]) / (n * v + sig2[i-1])
+    mu[i] <- rnorm(1,mstar,sqrt(vstar))
+    # Metropolis Sampler
+    # Proposal Distribution is Normal..
+    
+    
+    cigs <- rnorm(1,sig2[i-1],sqrt(vv))
+    # Target Distribution is uniform, 
+    
+    gxc <- sum(dnorm(cholest.u, mu[i], sqrt(sig2[i-1]), log = TRUE)) + dunif(sig2[i-1],0,500, log = TRUE)
+    gxp <- sum(dnorm(cholest.u, mu[i], sqrt(cigs), log = TRUE)) + dunif(cigs, 0, 500, log = TRUE)
+      
+      # if candidate is < 0, throw it away!
+    
+    if (exp(gxp) <= 0 | exp(gxc) <= 0) {
+      sig2[i] <- sig2[i-1]
+    } else {
+      # compute the probability of accepting the proposed value of alpha
+      alpha <- min(c(1, exp(gxp - gxc))) 
+      # bernoulli between 0 and 1
+      purrr::rbernoulli(1, alpha) %>% 
+        ifelse(cigs, sig2[i-1]) -> sig2[i]
+      rm(mstar,vstar,cigs,gxc,gxp,alpha)      
+    }
+}
+```
+
+```{r, echo = FALSE, results = FALSE}
+gc(FALSE,TRUE)
+```
+
+```{r}
+# Burn and thin the data
+ind <- seq(500,length(mu),by = 50)
+
+plot(mu[ind], type = 'l') 
+acf(mu[ind]) 
+
+plot(sig2[ind], type = 'l') 
+acf(sig2[ind])  # it's okay.
+```
+
+Find the posterior expected value for both µ and σ<sup>2</sup> and compare them to values you obtained in problem 2b and 2c of homework 10.
+
+```{r}
+c("Gibbs Mean" = mean(mu[ind]), "Metropolis Variance" = mean(sig2[ind]))
+```
+
+```{r, echo = FALSE, results= FALSE}
+rm(list =ls())
+```
+
