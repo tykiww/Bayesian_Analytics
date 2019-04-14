@@ -1,0 +1,213 @@
+---
+title: "Homework 11"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+---
+
+In this homework we will compare a frequentist regression analysis to a Bayesian. The first few problems of this
+homework should be a review from the simple linear regression component of your introductory stat course. Remember
+to submit your R code along with the completed homework.
+
+A researcher measured heart rate (x) and oxygen uptake (y) for one person under varying exercise conditions.
+He wishes to determine if heart rate, which is easier to measure, can be used to predict oxygen uptake. If
+so, then the estimated oxygen uptake based on the measured heart rate can be used in place of the measured
+oxygen uptake for later experiments on the individual. Below I provide the heart rate and oxygen uptake
+measurements take on the subject.
+
+```{r}
+heart.rate <- c(94, 96, 94, 95, 104, 106, 108, 113, 115, 121, 131)
+oxygen.uptake <- c(0.47, 0.75, 0.83, 0.98, 1.18, 1.29, 1.40, 1.60, 1.75, 1.90, 2.23)
+```
+
+To learn about this assocation the researcher decides to employ a simple linear regression model which is the
+following:
+
+y<sub>i</sub> = β<sub>0</sub> + β<sub>1</sub>x<sub>i</sub> + ε<sub>i</sub> with ε<sub>i</sub> ∼ N(0, σ<sup>2</sup>)
+
+### (a) 
+
+List the assumptions that accompany the simple linear regression model.
+
+  1. Linearity
+  2. E(error) = 0 centered at 0 (Normally distributed error terms)
+  3. V(error) is constant (homoscedastic)
+  4. Independence of data and errors.
+
+### (b) & (c)
+
+Plot oxygen uptake (y) versus heart rate (x) using a scatterplot with both axis correctly labeled. Using the lm function in R fit the simple linear regression model and plot it. (Hint: you fit the model using lm(y ∼ x))
+
+```{r}
+plot(y = oxygen.uptake,x = heart.rate, xlab = "Oxygen Uptake", ylab = "Heart Rate")
+lm(oxygen.uptake ~ heart.rate) %>% abline(col = 'red', lwd = 2)
+```
+
+### (d) 
+
+Perform the hypothesis test H<sub>0</sub>: β<sub>1</sub> = 0 vs H<sub>1</sub>: β<sub>1</sub> > 0. What conclusions can you make?
+
+```{r}
+# P-value for the β1 coefficient (two-sided)
+(lm(heart.rate ~ oxygen.uptake) %>% summary)$coefficients[8]/2
+```
+
+*At a significance level of 0.05 and p-value less than 10<sup>-6</sup> we reject the null hypothesis and conclude that there seems to be an oxygen uptake effect*
+
+### (e) 
+
+You should always explore the appropriateness of the assumptions that accompany the model, but I won’t have you explore them for this homework.
+
+y<sub>i</sub>|β<sub>0</sub>, β<sub>1</sub>, σ<sup>2</sup>, x<sub>i</sub> ∼ N(β<sub>0</sub> + β<sub>1</sub>x<sub>i </sub>, σ<sup>2</sup>)
+
+and assume the following prior distributions
+
+- β<sub>0</sub> ∼ N(m<sub>0</sub>, v<sub>0</sub>)
+- β<sub>1</sub> ∼ N(m<sub>1</sub>, v<sub>1</sub>)
+- σ<sup>2</sup> ∼ IG(shape = a,rate = b)
+
+### (f) 
+
+What are the assumptions associated with the Bayesian simple linear regression model?
+
+*independence b0, b1 normally distributed, sig2 inverse gamma. The rest is the same as the LINE assumptions.*
+
+
+To “fit” the model from a Bayesian perspective we need to derive the joint posterior distribution for β<sub>0</sub>, β<sub>1</sub>, and σ2. As you discussed in class, this joint distribution does not have a form of a well known probability distribution and as a result is not easily sampled from (e.g., there does not exist any “r” function in R). Because of this, we resort to constructing a Gibbs-sampler that is able to take or sample draws from the joint posterior distribution. To build a Gibbs-sampling algorithm, we need the full conditions for β<sub>0</sub>, β<sub>1</sub>, and σ<sup>2</sup>. From class recall that
+
+Full Conditional β<sub>0</sub> 
+
+    s2star <- 1/((n/sigma2[i-1]) + 1/v0)
+    mstar <- ( (1/sigma2[i-1]) * sum(y - beta1[i-1]*x) + (m0/v0) ) * s2star
+
+
+Full Conditional β<sub>1</sub> 
+
+    s2star <- 1 / ( (sum(x^2)/sigma2[i-1]) + 1/v0 )
+    mstar <- ( (1/sigma2[i-1]) * sum(x*(y - beta0[i])) + (m1/v1) ) * s2star
+
+Full Conditional σ<sup>2</sup> 
+
+    astar <- 0.5 * n + a
+    bstar <- 0.5 * sum((y - (beta0[i] + beta1[i]*x))^2) + 1/b
+
+### (g) 
+
+Show that full conditional for σ2 is what I listed above. Showing this should in theory consist of three or four steps.
+
+![](https://raw.githubusercontent.com/tykiww/Bayesian_Analytics/master/stat_251/reg_ig.jpg)
+
+### (h)  
+
+Write a computer program that employs a Gibbs-sampler to sample from the joint posterior distribution of β<sub>0</sub>, β<sub>1</sub>, and σ2. For prior distribution parameters use m<sub>0</sub> = m<sub>1</sub> = 0, v<sub>0</sub> = v<sub>1</sub> = 100, and a = b = 1. Comment very briefly on if you think these values produce reasonable prior distributions.
+
+*These priors indicate the null hypothesis that the intercept and coefficient do not have any effect, essentially assuming ignorance. a = b = 1 also show that we are ignorant of what the variance is. We may update it later since we are not certain at this moment.*
+
+```{r}
+mcmc_regression <- function(J, burn, thin, y, x, m0, v0, m1, v1, a,b) {
+  # Requirements..
+  fr <- lm(y~x); n <- length(y); 
+  keep <- seq(burn + 1,J, by = thin)
+  # Starting values
+  beta0 <- c(fr$coefficients[1]) %>% as.numeric
+  beta1 <- c(fr$coefficients[2]) %>% as.numeric
+  sigma2 <- c(summary(fr)$sigma^2) %>% as.numeric
+  for (i in 2:J) {
+    # update beta0
+    s2star <- 1/((n/sigma2[i-1]) + 1/v0)
+    mstar <- ( (1/sigma2[i-1]) * sum(y - beta1[i-1]*x) + (m0/v0) ) * s2star
+    beta0[i] <- rnorm(1, mstar,sqrt(s2star))
+    # update beta2
+    sumx2 <- sum(x^2)
+    s2star <- 1 / ( (sumx2/sigma2[i-1]) + 1/v0 )
+    mstar <- ( (1/sigma2[i-1]) * sum(x*(y - beta0[i])) + (m1/v1) ) * s2star
+    beta1[i] <- rnorm(1, mstar, sqrt(s2star))
+    # update sigma2
+    astar <- 0.5 * n + a
+    bstar <- 0.5 * sum((y - (beta0[i] + beta1[i] * x)) ^ 2) + b # I choose rate!
+    sigma2[i] <- rinvgamma(1,astar,bstar)
+  }
+  list("beta0" = beta0[keep],"beta1" = beta1[keep],"sigma2" = sigma2[keep])
+}
+```
+
+```{r}
+gibbs_reg <- mcmc_regression(J = 1001000, burn = 1000, thin = 150, oxygen.uptake, 
+                heart.rate, m0 = 0, v0 = 100, m1 = 0, v1 = 100, a = 1, b = 1)
+```
+
+### (i) 
+
+Argue that the algorithm has converged using trace plots and autocorrelation plots (e.g., use acf function in R)
+
+```{r}
+par(mfrow = c(3,2))
+plot(gibbs_reg$beta1, type = 'l'); plot(gibbs_reg$beta0, type = 'l'); plot(gibbs_reg$sigma2, type = 'l')
+acf(gibbs_reg$beta1); acf(gibbs_reg$beta0); acf(gibbs_reg$beta1)
+par(mfrow = c(1,1)) # close enough.
+```
+
+### (j) 
+
+Plot the posterior (after removing enough burn-in draws) and prior distribution in the same graph for
+each parameter (this part should consist of three plots). Make sure the appropriately label the figures.
+
+```{r}
+plot(seq(-30,30,length = 1000), dnorm(seq(-30,30,length = 1000),0,sqrt(100)), 
+     type = 'l', ylim = c(0, .31), main = expression("Prior vs Posterior B"[0]), 
+     xlab = expression(theta), ylab = expression(paste(pi,"(", theta,")", sep = "")))
+lines(density(gibbs_reg$beta0))
+
+plot(seq(-10,10,length = 1000), dnorm(seq(-10,10,length = 1000),0,sqrt(100)), 
+     type = 'l', ylim = c(0, 35), main = expression("Prior vs Posterior B"[1]), 
+     xlab = expression(theta), ylab = expression(paste(pi,"(", theta,")", sep = "")))
+lines(density(gibbs_reg$beta1)) 
+
+plot(seq(0,20,length = 1000), dinvgamma(seq(0,20,length = 1000),1,1), 
+     type = 'l', ylim = c(0, 5), main = expression("Prior vs Posterior σ"^2), 
+     xlab = expression(theta), ylab = expression(paste(pi,"(", theta,")", sep = "")))
+lines(density(gibbs_reg$sigma2)) 
+```
+
+
+### (k) 
+
+Create a scatter plot that contains the data, the least squares line from part (c) and the the fitted Bayesian
+regression line. Use the color red for the least squares line and blue for the Bayesian line. Comment briefly
+on the differences you see between the frequentist fit and Bayesian fit.
+
+```{r}
+plot(y = oxygen.uptake,x = heart.rate, xlab = "Oxygen Uptake", ylab = "Heart Rate")
+lm(oxygen.uptake ~ heart.rate) %>% abline(col = 'red', lwd = 2)
+abline(c(mean(gibbs_reg$beta0), mean(gibbs_reg$beta1)), col = 'blue')
+```
+
+*These fits look very similar, but we can still see a difference from the frequentist regression. Frequentist has a steeper slope.*
+
+### (l) 
+
+Test the hypothesis that H<sub>0</sub>: β<sub>1</sub> = 0 vs H<sub>1</sub>: β<sub>1</sub> > 0. We did not discuss how to do this type of hypothesis test from a Bayesian perspectve. As you might imagine, testing the hypothsis will require using the posterior distribution of β<sub>1</sub>. Try your best to come up with a testing procedure based on the posterior distribution for β<sub>1</sub> that permits you to make a conclusion associated with the competing hypothsis. Ask yourself, “What would convince me (based on the posterior distribution of β<sub>1</sub>) that the hypothsis is wrong”. 
+
+```{r}
+quantile(gibbs_reg$beta1, c(.025, 0.975)) # one sided significance
+mean(gibbs_reg$beta1 > 0) # one sided
+```
+
+
+### (m) 
+
+For the last problem of this homework, we will consider the posterior predictive in a regression setting. For a new individual with a heart-rate of 95 collect the same number of draws from the posterior predictive distribution as you collected from the joint posterior distribution of β<sub>0</sub>, β<sub>1</sub>, and σ<sup>2</sup> (after burn-in). What is the support of the posterior predictive distribution in a regression setting? Plot the distribution and briefly describe the information that it provides.
+
+*The support of the posterior predictive is normal (-inf,inf). It conforms to the data (oxygen intake).*
+
+```{r}
+J <- length(gibbs_reg$beta0)
+mu <- gibbs_reg$beta0+gibbs_reg$beta1*95
+stdev <- sqrt(gibbs_reg$sigma2)
+post_pred <- rnorm(J,mu,stdev)
+
+summary(post_pred)
+plot(density(post_pred))
+```
+
