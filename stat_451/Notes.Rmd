@@ -1,0 +1,309 @@
+---
+title: "Stat_451_Notes"
+output: word_document
+---
+
+Notes:
+--xbar has a sampling distribution
+--confidence interval--called that because we are confident in our method and that it would work if repeated many times
+--Parameters are fixed but unknown for frequentists
+--post(parameters|data) oc likelihood(data|parameters) * prior(parameters)
+--As frequentists, we'll assume the data is normal (in likelihood function)
+--As Bayesians, we assume parameters in the prior are random variables and have a density while parameters are fixed in frequentists
+--Pr(A^B) = Pr(A) * Pr(B) iff A and B are independent
+--Pr(A^B) = Pr(A|B) * Pr(B) = Pr(B|A) * Pr(A)
+--Pr(A|B) = Pr(B|A) * Pr(A) / Pr(B/.)
+
+```{r}
+postmu <- function(data, sigma2, prior_mu, prior_sig2) {
+  xbar <- mean(data)
+  n <- length(data)
+  tau2 <- 1/sigma2
+  prior_tau2 <- 1/prior_sig2
+  post_mu <- (n*tau2*xbar + prior_tau2*prior_mu) / (n*tau2 + prior_tau2)
+  post_prec <- n*tau2 + prior_tau2
+  post_var <- 1/post_prec
+  post_sd <- sqrt(post_var)
+  out <- c(post_mu, post_sd, post_var)
+  return(out)
+}
+```
+
+```{r}
+update_sig2 <- function(data, a, s, mu) {
+  n <- length(data)
+  SSx <- sum((data - mu)^2)
+  post_shape <- n/2 + a
+  post_scale <- 2*s/(s*SSX+2)
+  c(post_shape, post_scale)
+}
+```
+
+```{r}
+igpdf <- function(x, shape, rate) {
+  ((rate^shape) / gamma(shape)) * (x^(-shape - 1)) * exp(-rate/x)
+}
+```
+Good starting values for prior mean and variance are mean(data) and var(data)
+
+
+Gibbs Sampler
+```{r}
+gibbs_samp <- function(data, prior_mu, prior_var, shape, rate) {
+  out <- matrix(0, 1000, 2)
+  out[1,1] <- mean(data)
+  out[1,2] <- var(data)
+  
+  for (i in 2:1000) {
+    # get posterior values for parameters for normal mean update -- post ~ N(m,v)
+    out[i,1] <- rnorm(1, out[i-1, 1], sqrt(out[i-1, 2]))
+    # get posterior values for IG update (shape, rate)
+    out[i,2] <- 1/rgamma(1, shape, rate)
+  }
+}
+```
+
+```{r}
+set.seed(5)
+dat1 <- rbinom(20, 1, .2)
+dat1
+
+.3 + c(-1,1) * 1.96 * sqrt(.3*.7/20)
+```
+
+```{r}
+curve(dbeta(x, 7, 15), from = 0, to = 1)
+
+qbeta(c(0.025, 0.975), 7, 15)
+
+curve(dbeta(x, 6, 14), from = 0, to = 1)
+curve(dbeta(x, 12, 28), from = 0, to = 1)
+
+qbeta(c(0.025, 0.975), 12, 28)
+```
+
+The likelihood now dominates the prior if the number of data points is much greater than the prior values.
+
+Credible interval = posterior probability interval
+
+
+```{r}
+g <- function(data, theta, a, b) {
+  theta^(sum(data)+a-1)*(1-theta)^(length(data)-sum(data)+b-1)
+}
+
+lng <- function(data, theta, a, b) {
+  (sum(data)+a-1)*log(theta) + (length(data)-sum(data)+b-1)*log(1-theta)
+}
+
+metBern <- function(data, pra, prb, loops, candsig) {
+  cntr <- 0
+  out <- NULL
+  out[1] <- .5
+  for (i in 2:loops) {
+    out[i] <- out[i-1]
+    cand <- rnorm(1, out[i-1], candsig)
+    if (cand > 0 & cand < 1) {
+      r <- lng(data, cand, pra, prb) - lng(data, out[i-1], pra, prb)
+      if (r > log(runif(1,0,1))) {
+        out[i] <- cand
+        cntr <- cntr + 1
+      }
+    }
+  }
+  return(list(out = out, cntr = cntr))
+}
+```
+
+Counter (cntr) should be somewhere between .15 and .4 for a metropolis sampler.
+
+
+Jags
+```{r}
+library(rjags)
+library(R2jags)
+
+mdl <- "
+  model {
+
+   for (i in 1:N) {
+     y[i] ~ dbern(theta)
+   }
+   theta ~ dbeta(1,1)
+  }
+
+"
+
+writeLines(mdl, 'bern.txt')
+set.seed(5)
+y <- rbinom(10, 1, .3)
+N <- length(y)
+data.jags <- c('y', 'N')
+parms <- c('theta')
+bern.sim <- jags(data = data.jags, inits = NULL, parameters.to.save = parms,
+                 model.file = 'bern.txt', n.chains = 5, n.iter = 5000, n.burnin = 1000,
+                 n.thin = 1)
+```
+
+Rhat comes from having more than 1 chain--An Rhat of 1 says that all chains are converging to the same place.
+Deviance: -2 * log likelihood
+Information criteria: -2 * log likelihood + penalty
+Deviance Information Criteria: 
+p_d = variance(deviance) / 2 (We want it to be about the number of parameters there are)
+DIC = mean(deviance) + p_d (penalty)
+
+Another way to compute p_d = mean(deviance) - deviance(mean(theta))
+
+autocorr.diag() allows us to look at autocorrelation by lagging the values to comparing. Takes an as.mcmc() object.--low, reduce by thinning
+
+effectiveSize() shows if samples are independent or not by if the number of draws is close to the output of the function.--above 5000
+
+raftery.diag() should be used on mcmc object of all chains given. Tells accuracy in tail. Look at dependence factor and if it's about 1 for theta then it's pretty accurate. If the number gets above 5, you shouldn't be using chains for posterior probability intervals--use mean. 2 or 3 is not good either. Change this number by thinning.
+
+gelman.diag() looks at beginning and end of chains--similar to Rhat
+
+Also plot trace plots to see that it looks reasonable
+
+```{r}
+library('R2jags')
+# Remember you put in precisions and not variances in jags
+mdl <- "
+  model {
+    for (i in 1:33) {
+      y[i] ~ dnorm(mu[tmt[i]], 1/vr[tmt[i]])
+    }
+  # vr ~ dunif(0, 4000)
+    for (i in 1:2) {
+      mu[i] ~ dnorm(0, 0.000001)
+      vr[i] ~ dunif(0, 5000)
+  # prec[i] <- 1/vr[i]
+    }
+  }
+"
+writeLines(mdl, "twogroups.txt")
+dat <- read.table('01twogroups.dat')
+tmt <- dat$V1
+y <- dat$V2
+
+data.jags <- c('tmt', 'y')
+parms <- c('mu', 'vr')
+
+twogroups.sim <- jags(data = data.jags, inits = NULL, parameters.to.save = parms,
+                      model.file = 'twogroups.txt', n.iter = 50000, n.burnin = 10000,
+                      n.chains = 5, n.thin = 5)
+```
+
+```{r}
+# Some analysis after running simulation
+sims <- as.mcmc(twogroups.sim)
+chains <- as.matrix(sims)
+sims2 <- as.mcmc(chains) # Combine all chains into 1 chain
+
+# Standard diagnostics
+raftery.diag(sims2)
+effectiveSize(sims2)
+autocorr.diag(sims2) # You can reduce auto-correlation by thinning
+
+# Look at ratio of variances
+ratvar <- chains[,4] / chains[,5]
+plot(density(ratvar))
+mean(ratvar > 1)
+plot(sims2)
+plot(chains[,4], type = 'l')
+# If you have more knowledge of the variance, you probably want to use a gamma prior rather than a uniform prior
+curve(dgamma(x, 20, 1/50), from = 0, to = 4000)
+```
+Try model defining different variances
+```{r}
+library('R2jags')
+# Remember you put in precisions and not variances in jags
+mdl <- "
+  model {
+    for (i in 1:33) {
+      y[i] ~ dnorm(mu[tmt[i]], 1/vr[tmt[i]])
+    }
+   vr[1] ~ dgamma(20, .02)
+   vr[2] ~ dgamma(10, .1)
+    for (i in 1:2) {
+      mu[i] ~ dnorm(0, 0.000001)
+      #vr[i] ~ dunif(0, 5000)
+  # prec[i] <- 1/vr[i]
+    }
+  }
+"
+writeLines(mdl, "twogroups.txt")
+dat <- read.table('01twogroups.dat')
+tmt <- dat$V1
+y <- dat$V2
+
+data.jags <- c('tmt', 'y')
+parms <- c('mu', 'vr')
+
+twogroups.sim <- jags(data = data.jags, inits = NULL, parameters.to.save = parms,
+                      model.file = 'twogroups.txt', n.iter = 50000, n.burnin = 10000,
+                      n.chains = 5, n.thin = 5)
+
+plot(density(chains[,4]), xlim = c(0, 2000), ylim = c(0, 0.01))
+lines(density(chains[,5]), col = 'red')
+
+mudif <- chains[,3]-chains[,2]
+plot(density(mudif))
+mean(mudif > 0) # Posterior probability that the first group has a smaller mean than the second group
+quantile(mudif, c(0.025, 0.975))
+```
+
+
+Jags One-Way Anova
+
+```{r}
+library(R2jags)
+mdl <- "
+  model {
+    for (i in 1:28) {
+      response[i] ~ dnorm(mu[tmt[i]], prec)
+    }
+    prec <- 1/vv
+    vv ~ dgamma(2, .1)
+    for (i in 1:4) {
+      mu[i] ~ dnorm(15, .0001)
+    }
+  }
+"
+
+writeLines(mdl, 'anova.txt')
+dat <- read.table('04anova.dat')
+tmt <- dat$V1
+response <- dat$V2
+
+data.jags <- c('tmt', 'response')
+parms <- c('mu', 'vv')
+
+anova.sim <- jags(data = data.jags, inits = NULL, parameters.to.save = parms,
+                      model.file = 'anova.txt', n.iter = 42000, n.burnin = 2000,
+                      n.chains = 5, n.thin = 8)
+```
+```{r}
+mu1vmu2 <- chains[,2] - chains[,3]
+mu1vmu3 <- chains[,2] - chains[,4]
+mu1vmu4 <- chains[,2] - chains[,5]
+mu2vmu3 <- chains[,3] - chains[,4]
+mu2vmu4 <- chains[,3] - chains[,5]
+mu3vmu4 <- chains[,4] - chains[,5]
+
+plot(density(mu1vmu2), type = 'l')
+plot(density(mu1vmu3), type = 'l')
+```
+Test Interaction
+```{r}
+intact <- chains[,2] - chains[,3] - chains[,4] + chains[,5]
+plot(density(intact))
+mean(intact < 0)
+```
+Marginal Effects
+```{r}
+mainirg <- .5*chains[,2] + .5*chains[,3] - .5*chains[,4] - .5*chains[,5]
+plot(density(mainirg))
+mainfert <- .5*chains[,2] + .5*chains[,4] - .5*chains[,3] - .5*chains[,5]
+plot(density(mainfert))
+```
+
