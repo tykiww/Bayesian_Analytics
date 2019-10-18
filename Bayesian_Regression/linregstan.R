@@ -1,5 +1,3 @@
-setwd("C:/Users/tykwad1/Downloads")
-
 V1 <- c(30,20,60,80,40,50,60,30,70,60)
 V2 <- c(73,50,128,170,87,108,135,69,148,132)
 linreg<- data.frame(cbind(V1,V2))
