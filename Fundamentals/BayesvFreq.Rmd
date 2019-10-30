@@ -45,11 +45,13 @@ t_test <- function(x,mu = 0, alpha = .05) {
 }
 ```
 
-$\overline{x}$ is assumed to be distributed normal. This theory is based on the sampling distribution. The notion is that if we drew more and more samples, they will each have a different mean (that's not wrong). IF the distribution of x itself is normal, then the distribution of $\overline{x}$ should also be normal (CLT). Therefore, the average of the sampling distribution should approximate to the 'True' mean value IF sampled over and over again and can be expressed in the form of a confidence interval.
+$\overline{x}$ is assumed to be distributed normal. In hand-wavy terms, this means that the probability of finding the true estimate (mean, $\overline{x}$) follows a gaussian (normal) character.
+
+This theory is based on the sampling distribution. The notion is that if we drew more and more samples, they will each have a different mean (that's not wrong). IF the distribution of x itself is normal, then the distribution of $\overline{x}$ should also be normal . Therefore, the average of the sampling distribution should approximate to the 'True' mean value (Central Limit Theorem) IF sampled over and over again. This allows for us finding the "true" fixed estimate of x and can be expressed in the form of a confidence interval estimate.
 
 But wait! How sure are you that the mean is actually in the interval even if we sampled over and over again? "We are 95% confident.." Actually, we don't know whether the mean is in or not in the interval (it's really not useful information). We are 'confident' in the _method_ that 95% of the time the interval will contain the true paramete IF we repeated this sampling process n number of times....
 
-Well duh. That's like saying if I took the average of all the samples of almost the whole population, I should get the true mean. We know [linearity of expectation]() (taking the average of an average) holds, but the confidence interval doesn't really tell us anything because we actually HAVEN'T sampled the procedure more than once. Unless you are a Bayes, you have no framework to do a problem unless you have a sampling distribution.
+Well duh. That's like saying if I took the average of all the samples of almost the whole population, I should get the true mean. We know [linearity of expectation](https://brilliant.org/wiki/linearity-of-expectation/) (taking the average of an average is still the average) holds, but the confidence interval doesn't really tell us anything because we actually HAVEN'T sampled the procedure more than once. Unless you are a Bayes, you have no framework to do a problem unless you have a sampling distribution.
 
 ### (2) Rejecting the Null
 
