@@ -55,16 +55,19 @@ Well duh. That's like saying if I took the average of all the samples of almost 
 
 ### (2) Rejecting the Null
 
-What is the null really? The confidence interval is already an implicit hypothesis test, so we already know that there are potential faults. You cannot do frequentist work without a null space. There needs to be some constraint. 90% confidence? 80% confidence? On what basis should we decide? What happens when a parameter can be both null and not at the same time? (That'll come next). For Bayesians, it's simple, p-values are useless. The bayesian paradigm follows the law of probability.
-
+What is the null really? The confidence interval is already an implicit hypothesis test, so we already know that there are potential faults. You cannot do frequentist work without a null space. There needs to be some constraint. 90% confidence? 80% confidence? On what basis should we decide? What happens when a parameter can be both null and not at the same time? (That'll come next). For Bayesians, it's simple, p-values are useless. The bayesian paradigm (hand-waving here) mimicks the law of probability (with a lot of measure theory backing it up).
 
 $$Posterior(parameters|data) \propto Likelihood(data|parameters)*Prior(parameters)$$
 
-Don't get me wrong. I do think hypothesis testing is a really important logical tool for inference. But it only works if parameters are fixed.
+Don't get me wrong. I do think hypothesis testing is a really important logical tool for inference. But it works best if parameters are fixed.
 
 ### (3) Paremeters are fixed and unknown
 
-Are all parameters fixed and unknown? Not always; for the most case, paramters are always changing. Let's take for example sports. Am I to believe that Lebron James' skills have a true [fixed level](https://www.nytimes.com/2017/12/29/sports/basketball/lebron-james-kerr.html)?  
+What I mean by parameters being fixed and unkown is this: Any estimate (mu, sigma) is UNCHANGING and can never really be known.
+
+Are all parameters fixed and unknown? Not always; for the most case, paramters are always changing. Let's take for example sports. Am I to believe that Lebron James' skills have a true [fixed level](https://www.nytimes.com/2017/12/29/sports/basketball/lebron-james-kerr.html)? 
+
+Bayesians will say otherwise: Any estimate (mu, sigma, etc) is frequently changing and CAN be known by a probability distribution.
 
 ```r
 # Lebron Field Goal Average (All teams)
@@ -76,7 +79,9 @@ qplot(x, fga, geom = 'line', xlab = "Year", ylab = "Field Goal Average")
 
 ![](https://raw.githubusercontent.com/tykiww/imgbucket/master/img/BayesvFreq/one.jpg)
 
-The Bayesian method of updating prior distributions using the data (likelihood) into current posteior and predictive distributions is really intuitive. It really pays off to have densities as parameters (think of a Bayesian parameter as a random variable) especially when you can make intuitive assumptions about your prior estimates.
+We can say prior to our estimation, that Lebron has a certain estimate right now. As we use the data and assume that his success follows a fitting distribution, we can model an unchanging estimate that fits a proper distribution.
+
+The Bayesian method of updating prior distributions using the data (likelihood) into current posteior and predictive distributions is very intuitive. Your thoughts + data = new thoughts. It really pays off to have parameters as probability densities (think of a Bayesian parameter as a random variable) especially when you can make intuitive assumptions.
 
 ### (4) Issues with unequal variance
 
@@ -99,15 +104,16 @@ skim(two_groups)
     ##    groups       0       33 33   1.42  0.5   1   1   1   2    2 ▇▁▁▁▁▁▁▆
     ##    values       0       33 33 129.03 20.14 94 118 123 142  180 ▁▂▇▂▂▂▁▁
 
-Can you really perform a two-sample t-test? Or for that matter, any statistical test? In any test: When your assumptions break, your models break. But wait, how about Welch's two-sample t-test? Yeah, that could work? But there is no closed form (cannot be evaluated in a finite number of standard operations). Plus, how are we going to decide the degrees of freedom analytically???
+    ## variance [group 1]    791.0
+    ## variance [group 2]     62.6 # Whoa, can't do much frequentist stuff with that kind of difference in variance.
 
-Bayes can take care of that unequal variance by just "integrating" out the variance (Just a fancy way of telling the computer to toss it out).
+Can you really perform a two-sample t-test? Or for that matter, any statistical test? In any test: When your assumptions break, your models break. But wait, how about Welch's two-sample t-test with unequal variances? Yeah, that could work? But there is no closed form (cannot be evaluated in a finite number of standard operations). Plus, how are we going to decide the degrees of freedom analytically???
+
+Bayes can take care of that unequal variance by just "integrating" out the variance (Just a fancy way of telling the computer to toss it out. Or you can do the math if it has a closed form, bleh).
 
     ## P(A n B) = P(A)P(B) iff A & B are independent
     ## p(A n B) = p(A|B)P(B) = P(B|A)P(A)
     ## p(A|B) = p(B|A)P(A)/P(B) # integrate out A space to get B space (integrate out the parameters to get the data).
-    
-The theory behind this isn't trivial, but it works in closed form!
 
 ```{r}
 library(rjags)
@@ -147,14 +153,8 @@ twogroups.sim <- jags(data= data.jags, inits = NULL, parameters.to.save=parms,
                       model.file='twogroups.txt', n.iter=50000, n.burnin=10000,
                       n.chains = 5, n.thin = 5)
 
-```
+# Grab the outputs
 
-    ## variance [group 1]    791.0
-    ## variance [group 2]     62.6
-
-Whoa, can't do much with that kind of variance.
-
-```{r}
 sims <- as.mcmc(twogroups.sim) # Coerce simulation as mcmc object
 chains <- as.matrix(sims) # Grab the matrixed chains
 
@@ -166,11 +166,11 @@ sprintf("The posterior probability that group 1 is bigger than group 2 is %s", m
 
     ## [1] "The posterior probability that group 1 is bigger than group 2 is 0.973125"
 
-That was pretty wordy, but the fact is, it works. No worries about variance, and no need for a p-value!
+Yes, that was a LOT more work than just running `t.test()`. However, we have reliable estimates. And I mean REALLY realiable. No worries about the variance and no need for a p-value. How much greater can it get?
 
 ### (5) Frequentists think Bias is bad
 
-Honestly, this is a flawed argument (But I've probably been making a ton of those in this post. Ha!). What is not unbiased about a degree of freedom? Technically, an assumption is a bias (a bit of a stretch, sorry) as well. As you get more complicated with frequentist work, most things are biased. You just can't escape it. Plus, what's wrong with bias anyways? 
+Honestly, this is a flawed argument (I've probably been making a ton of those in this post). What is not unbiased about a degree of freedom? Technically, an assumption is a bias as well. As you get more complicated with frequentist work, most things are biased. You just can't escape it. Plus, what's wrong with bias anyways? 
 
 If you knew that an UNBIASED coin (p = .5) was flipped once and you landed tails. If you were a frequentist, what would you say the true probability is?
 
@@ -178,12 +178,11 @@ If you knew that an UNBIASED coin (p = .5) was flipped once and you landed tails
 data <- c(0)
 t.test(data)
 ```
-
     ## Error in t.test.default(data) : not enough 'x' observations
 
-Can't do it!
+Can't do it! Error..
 
-How about if you landed tails 3 times?
+How about if you landed tails 5 times in a row?
 
 ```r
 data <- c(0,0,0,0,0,0)
@@ -202,9 +201,9 @@ t.test(data)
     ##  mean of x 
     ##          0 
 
-What do you even learn from this? 
+What do you even learn from this? That the true probability of getting a heads is 0? We know that we'll get a heads somewhere and it'll probably even out (law of large numbers).
 
-If you have experience or strong intuition and data is sparse, wouldn't you favor that estimate?
+If you have experience or strong intuition and data is sparse, wouldn't you favor that experience?
 
 ```{r}
 # Farily confident that out of 10 samples, 5 will be heads.
@@ -237,6 +236,6 @@ Even with limited data, we are still able to inference because of our previous d
 
 ### Conclusion
 
-Now, this post is definitely biased, and I am okay with that. It really is up to you on how you view the world. I still mostly use frequentist methods and I am not smart enough to just create my own bayesian techniques. However, I feel that I am a more intuitive individual and this really speaks to me in terms of decision making. If our assumptions were wrong, we were wrong. At least we didn't just sit around and say we can't do anything about it.
+Now, this post is definitely biased, and I am okay with that. It really is up to you on how you view the world. I still mostly use frequentist methods because it is faster and can be easier. Plus, I am not smart enough to just create my own bayesian techniques all the time. However, I feel that I am a more intuitive individual and this really speaks to me in terms of decision making. If our assumptions were wrong, we are wrong. At least we didn't just sit around and say we can't do anything about it.
 
 
