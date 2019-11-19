@@ -1,3 +1,6 @@
+library(tidyverse)
+url <- "https://raw.githubusercontent.com/tykiww/projectpage/master/datasets/451/07mixedmods.dat"
+bond <- read_csv(url)
 library(R2jags)
 mdl <- "
 model  {
