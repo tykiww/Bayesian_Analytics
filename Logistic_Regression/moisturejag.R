@@ -1,3 +1,5 @@
+url <- "https://raw.githubusercontent.com/tykiww/projectpage/master/datasets/451/moisture.dat"
+wheat <- read_csv(url)
 library(R2jags)
 mdl <- '
   model {
