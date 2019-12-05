@@ -1,3 +1,8 @@
+url <- "https://raw.githubusercontent.com/tykiww/projectpage/master/datasets/weightlifting/weightsmult.txt"
+weightnew <- read.table(url)
+
+
+
 
 # Hierarchical model
 
