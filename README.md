@@ -1,2 +1,3 @@
 # Bayesian_Analytics
-Bayesian Analysis 
+
+![](https://raw.githubusercontent.com/tykiww/imgbucket/master/img/BayesvFreq/one.jpg)
